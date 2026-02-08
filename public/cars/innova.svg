@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f8fafc"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="carGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f1f5f9"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" fill="url(#bgGrad)"/>
+  <!-- MPV body - taller -->
+  <path d="M40,130 L50,130 L70,85 L120,75 L300,75 L340,85 L360,130 Z" fill="url(#carGrad)" stroke="#94a3b8" stroke-width="2"/>
+  <!-- Windows -->
+  <path d="M80,85 L115,78 L290,78 L330,85 L330,110 L80,110 Z" fill="#bfdbfe" opacity="0.8"/>
+  <!-- Window dividers -->
+  <line x1="160" y1="78" x2="160" y2="110" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="240" y1="78" x2="240" y2="110" stroke="#94a3b8" stroke-width="2"/>
+  <!-- Wheels -->
+  <circle cx="90" cy="140" r="22" fill="#1e293b"/>
+  <circle cx="90" cy="140" r="12" fill="#64748b"/>
+  <circle cx="310" cy="140" r="22" fill="#1e293b"/>
+  <circle cx="310" cy="140" r="12" fill="#64748b"/>
+  <!-- Ground line -->
+  <line x1="30" y1="162" x2="370" y2="162" stroke="#cbd5e1" stroke-width="2"/>
+  <!-- Text -->
+  <text x="200" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#64748b">Toyota Innova</text>
+</svg>

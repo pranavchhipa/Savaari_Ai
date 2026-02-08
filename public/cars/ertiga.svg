@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f8fafc"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="carGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#dc2626"/>
+      <stop offset="100%" style="stop-color:#b91c1c"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" fill="url(#bgGrad)"/>
+  <!-- MUV body -->
+  <path d="M45,130 L55,130 L70,90 L130,80 L290,80 L335,90 L355,130 Z" fill="url(#carGrad)"/>
+  <!-- Windows -->
+  <path d="M85,90 L125,82 L280,82 L320,90 L320,110 L85,110 Z" fill="#bfdbfe" opacity="0.8"/>
+  <!-- Window divider -->
+  <line x1="200" y1="82" x2="200" y2="110" stroke="#991b1b" stroke-width="2"/>
+  <!-- Wheels -->
+  <circle cx="95" cy="140" r="20" fill="#1e293b"/>
+  <circle cx="95" cy="140" r="10" fill="#64748b"/>
+  <circle cx="305" cy="140" r="20" fill="#1e293b"/>
+  <circle cx="305" cy="140" r="10" fill="#64748b"/>
+  <!-- Ground line -->
+  <line x1="35" y1="160" x2="365" y2="160" stroke="#cbd5e1" stroke-width="2"/>
+  <!-- Text -->
+  <text x="200" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#64748b">Maruti Ertiga</text>
+</svg>

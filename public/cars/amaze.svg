@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f8fafc"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="carGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e40af"/>
+      <stop offset="100%" style="stop-color:#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" fill="url(#bgGrad)"/>
+  <!-- Sedan body -->
+  <path d="M50,130 L70,130 L90,105 L150,95 L220,90 L290,95 L330,105 L350,130 Z" fill="url(#carGrad)"/>
+  <!-- Windows -->
+  <path d="M100,105 L145,92 L260,92 L300,105 Z" fill="#bfdbfe" opacity="0.8"/>
+  <!-- Wheels -->
+  <circle cx="100" cy="140" r="20" fill="#1e293b"/>
+  <circle cx="100" cy="140" r="10" fill="#64748b"/>
+  <circle cx="300" cy="140" r="20" fill="#1e293b"/>
+  <circle cx="300" cy="140" r="10" fill="#64748b"/>
+  <!-- Ground line -->
+  <line x1="40" y1="160" x2="360" y2="160" stroke="#cbd5e1" stroke-width="2"/>
+  <!-- Text -->
+  <text x="200" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#64748b">Honda Amaze</text>
+</svg>
