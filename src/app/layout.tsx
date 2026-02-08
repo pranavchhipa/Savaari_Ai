@@ -13,9 +13,17 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Savaari - Car Rentals & Outstation Cabs",
-  description: "Book outstation cabs and car rentals at best prices. Explore India with Sarathi AI - your AI trip planner for the perfect journey.",
-  keywords: "car rental, outstation cabs, taxi booking, Savaari, trip planner",
+  title: "Sarathi AI - Intelligent Road Trip Planner",
+  description: "Experience the future of road trips with Sarathi AI. Smart route planning, curated stops, and seamless outstation car rentals. Your journey, reimagined.",
+  keywords: "Sarathi AI, AI trip planner, road trip planner, outstation cabs, car rental, smart travel",
+  openGraph: {
+    title: "Sarathi AI - Intelligent Road Trip Planner",
+    description: "Plan your perfect road trip with AI. Smart routes, hidden gems, and seamless bookings.",
+    siteName: "Sarathi AI",
+    images: [{
+      url: "/opengraph-image",
+    }],
+  },
 };
 
 export default function RootLayout({
