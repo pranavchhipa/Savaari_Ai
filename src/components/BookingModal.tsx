@@ -33,6 +33,8 @@ interface BookingModalProps {
     tripStats: TripStats;
     selectedStops: Stop[];
     pickupDate: string;
+    dropDate?: string;
+    pickupTime: string;
 }
 
 import { useToast } from '@/components/ui/Toast';
@@ -58,6 +60,8 @@ export default function BookingModal({
     tripStats,
     selectedStops,
     pickupDate,
+    dropDate,
+    pickupTime,
 }: BookingModalProps) {
     const { showToast } = useToast();
     const [currentStep, setCurrentStep] = useState<BookingStep>('details');
@@ -68,7 +72,7 @@ export default function BookingModal({
         phone: '',
         email: '',
         pickupAddress: '',
-        pickupTime: '06:00',
+        pickupTime: pickupTime || '09:00', // Use prop or default
         specialRequests: '',
     });
     const [errors, setErrors] = useState<Partial<BookingFormData>>({});
@@ -137,6 +141,7 @@ export default function BookingModal({
             tripStats,
             selectedStops: selectedStops.map(s => ({ name: s.name, type: s.type })),
             pickupDate,
+            dropDate,
             createdAt: new Date().toISOString(),
             status: 'confirmed',
         };
@@ -485,11 +490,19 @@ export default function BookingModal({
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-slate-500">Pickup Date & Time</span>
+                                                <span className="text-slate-500">Pickup</span>
                                                 <span className="font-medium text-slate-800">
-                                                    {formatDate(pickupDate)}, {timeOptions.find(t => t.value === formData.pickupTime)?.label}
+                                                    {formatDate(pickupDate)} at {timeOptions.find(t => t.value === formData.pickupTime)?.label}
                                                 </span>
                                             </div>
+                                            {tripType === 'round-trip' && dropDate && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-500">Drop</span>
+                                                    <span className="font-medium text-slate-800">
+                                                        {formatDate(dropDate)}
+                                                    </span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between">
                                                 <span className="text-slate-500">Total Distance</span>
                                                 <span className="font-medium text-slate-800">{tripStats.totalDistanceKm} km</span>

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Location, Stop, RouteData, TripStats } from '@/types';
 import { getRoute, generateStopsAlongRoute, getMidpointForNightHalt } from '@/lib/routing';
 import { calculateTripStats } from '@/lib/calculateTripStats';
+import { searchLocations } from '@/lib/geocoding';
+import { isPointInBoundingBox, getMinDistanceToRoute, getRouteMetrics } from '@/lib/geoUtils';
 
 interface UseTripLogicProps {
     source: Location | null;
@@ -12,6 +14,9 @@ interface UseTripLogicProps {
     baseFare: number;
     perKmRate: number;
     driverAllowancePerDay: number;
+    pickupDate?: string;
+    dropDate?: string;
+    pickupTime?: string;
 }
 
 interface UseTripLogicReturn {
@@ -34,6 +39,7 @@ interface AIGeneratedStop {
     approximateKm: number;
     suggestedDuration: number;
     famousFor?: string;
+    detourKm?: number;
 }
 
 interface AIRouteStopsResponse {
@@ -54,6 +60,9 @@ export function useTripLogic({
     baseFare,
     perKmRate,
     driverAllowancePerDay,
+    pickupDate,
+    dropDate,
+    pickupTime,
 }: UseTripLogicProps): UseTripLogicReturn {
     const [routeData, setRouteData] = useState<RouteData | null>(null);
     const [stops, setStops] = useState<Stop[]>([]);
@@ -77,20 +86,24 @@ export function useTripLogic({
         routeCoordinates: { lat: number; lng: number }[],
         sourceLocation: Location,
         destLocation: Location,
-        totalDistanceKm: number
+        totalDistanceKm: number,
+        leg: 'onward' | 'return' = 'onward'
     ): Stop[] => {
         const result: Stop[] = [];
 
-        // Add start point
-        result.push({
-            id: 'start',
-            name: sourceLocation.name,
-            type: 'start',
-            location: sourceLocation,
-            duration: 0,
-            suggestedTime: '06:00 AM',
-            description: 'Trip starting point',
-        });
+        // Add start point only for onward
+        if (leg === 'onward') {
+            result.push({
+                id: 'start',
+                name: sourceLocation.name,
+                type: 'start',
+                location: sourceLocation,
+                duration: 0,
+                suggestedTime: '06:00 AM',
+                description: 'Trip starting point',
+                leg: 'onward'
+            });
+        }
 
         // Sort AI stops by distance
         const sortedAIStops = [...aiStops].sort((a, b) => a.approximateKm - b.approximateKm);
@@ -98,9 +111,25 @@ export function useTripLogic({
         // Add AI-generated stops
         sortedAIStops.forEach((aiStop, index) => {
             // Calculate approximate position on route
+            // For return leg, we might need to reverse logic if using same route coords, 
+            // but for now simple approximation is fine.
             const progress = Math.min(aiStop.approximateKm / totalDistanceKm, 0.95);
             const coordIndex = Math.floor(progress * (routeCoordinates.length - 1));
-            const coord = routeCoordinates[coordIndex] || routeCoordinates[Math.floor(routeCoordinates.length / 2)];
+            // If return leg, coordinate logic might need inversion closer to end? 
+            // Actually, AI returns "distance from Source". 
+            // For Return leg (Dest -> Source), "Source" is Destination. 
+            // So distance is from Destination.
+
+            let coord;
+            if (leg === 'return') {
+                // If fetching stops from Dest -> Source, approximateKm is from Dest.
+                // So on the original route (Source -> Dest), this is (Total - approx)
+                const returnProgress = Math.max(0, (totalDistanceKm - aiStop.approximateKm) / totalDistanceKm);
+                const returnCoordIndex = Math.floor(returnProgress * (routeCoordinates.length - 1));
+                coord = routeCoordinates[returnCoordIndex] || routeCoordinates[Math.floor(routeCoordinates.length / 2)];
+            } else {
+                coord = routeCoordinates[coordIndex] || routeCoordinates[Math.floor(routeCoordinates.length / 2)];
+            }
 
             // Calculate arrival time
             const startHour = 6;
@@ -112,7 +141,7 @@ export function useTripLogic({
             const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
 
             result.push({
-                id: `stop-${index + 1}`,
+                id: `${leg}-stop-${index + 1}`,
                 name: aiStop.name,
                 type: aiStop.type,
                 location: {
@@ -125,25 +154,30 @@ export function useTripLogic({
                 suggestedTime: `${String(displayHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`,
                 description: aiStop.whyVisit,
                 isSelected: false,
+                detourKm: aiStop.detourKm || 0,
+                leg: leg
             });
         });
 
-        // Add end point
-        const endTime = 6 + (totalDistanceKm / 40);
-        const endHour = Math.floor(endTime) % 24;
-        const endMinutes = Math.floor((endTime % 1) * 60);
-        const endPeriod = endHour >= 12 ? 'PM' : 'AM';
-        const endDisplayHour = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour;
+        // Add end point only for onward
+        if (leg === 'onward') {
+            const endTime = 6 + (totalDistanceKm / 40);
+            const endHour = Math.floor(endTime) % 24;
+            const endMinutes = Math.floor((endTime % 1) * 60);
+            const endPeriod = endHour >= 12 ? 'PM' : 'AM';
+            const endDisplayHour = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour;
 
-        result.push({
-            id: 'end',
-            name: destLocation.name,
-            type: 'end',
-            location: destLocation,
-            duration: 0,
-            suggestedTime: `${String(endDisplayHour).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')} ${endPeriod}`,
-            description: 'Trip destination',
-        });
+            result.push({
+                id: 'end',
+                name: destLocation.name,
+                type: 'end',
+                location: destLocation,
+                duration: 0,
+                suggestedTime: `${String(endDisplayHour).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')} ${endPeriod}`,
+                description: 'Trip destination',
+                leg: 'onward'
+            });
+        }
 
         return result;
     };
@@ -193,70 +227,175 @@ export function useTripLogic({
 
             setRouteData(route);
 
-            // Try to get AI-generated stops
-            const aiResponse = await fetchAIStops(
-                source.name,
-                destination.name,
-                route.distanceKm
-            );
+            // Fetch Onward Stops
+            const startName = source.name;
+            const destName = destination.name;
+            const distance = route.distanceKm;
 
-            let generatedStops: Stop[];
+            const onwardPromise = fetchAIStops(startName, destName, distance);
 
-            if (aiResponse && aiResponse.stops && aiResponse.stops.length > 0 && !aiResponse.fallback) {
-                // Use AI-generated stops
-                generatedStops = convertAIStopsToStops(
-                    aiResponse.stops,
-                    route.coordinates,
-                    source,
-                    destination,
-                    route.distanceKm
-                );
-
-                // Set night halt from AI if available
-                if (aiResponse.nightHalt) {
-                    const midIndex = Math.floor(route.coordinates.length / 2);
-                    setNightHaltSuggestion({
-                        location: route.coordinates[midIndex],
-                        suggestedCity: aiResponse.nightHalt.city,
-                    });
-                } else {
-                    const nightHalt = getMidpointForNightHalt(route.coordinates, route.distanceKm);
-                    setNightHaltSuggestion(nightHalt);
-                }
-
-                setScoutTip(`✨ Sarathi AI found ${aiResponse.stops.length} amazing stops for your ${source.name} to ${destination.name} trip!`);
-            } else {
-                // Fallback to hardcoded stops
-                generatedStops = generateStopsAlongRoute(
-                    route.coordinates,
-                    source,
-                    destination,
-                    route.distanceKm
-                );
-
-                const nightHalt = getMidpointForNightHalt(route.coordinates, route.distanceKm);
-                setNightHaltSuggestion(nightHalt);
+            // Only fetch return stops if Round Trip
+            let returnPromise: Promise<AIRouteStopsResponse | null> = Promise.resolve(null);
+            if (tripType === 'round-trip') {
+                returnPromise = fetchAIStops(destName, startName, distance);
             }
 
-            setStops(generatedStops);
+            const [onwardResponse, returnResponse] = await Promise.all([onwardPromise, returnPromise]);
 
-            // Auto-select start and end
-            const initialSelectedStops = generatedStops.filter(
-                (s) => s.type === 'start' || s.type === 'end'
-            );
-            setSelectedStops(initialSelectedStops);
+            let finalStops: Stop[] = [];
+
+            // Helper to process and validate stops
+            const processStops = async (
+                aiStops: AIGeneratedStop[],
+                leg: 'onward' | 'return',
+                legSource: Location,
+                legDest: Location,
+                routeCoordinates: RouteData['coordinates']
+            ): Promise<AIGeneratedStop[]> => {
+                const validatedStops: (AIGeneratedStop & { routeIndex: number })[] = [];
+
+                for (const stop of aiStops) {
+                    try {
+                        const locations = await searchLocations(stop.name);
+
+                        // Find the best matching location that is on the route
+                        let bestMatch: { location: Location; metrics: { minDistance: number; routeIndex: number } } | null = null;
+
+                        for (const loc of locations) {
+                            // First check if roughly in bounding box (100km buffer)
+                            if (isPointInBoundingBox(loc, legSource, legDest, 100)) {
+                                // Get precise route metrics
+                                const metrics = getRouteMetrics(loc, routeCoordinates);
+
+                                // Strict 50km limit from route
+                                if (metrics.minDistance <= 50) {
+                                    if (!bestMatch || metrics.minDistance < bestMatch.metrics.minDistance) {
+                                        bestMatch = { location: loc, metrics };
+                                    }
+                                }
+                            }
+                        }
+
+                        if (bestMatch) {
+                            validatedStops.push({
+                                ...stop,
+                                routeIndex: bestMatch.metrics.routeIndex
+                            });
+                        } else {
+                            console.warn(`[Sarathi] Rejected stop: ${stop.name} - Not found near route`);
+                        }
+                    } catch (e) {
+                        console.warn(`[Sarathi] Geocoding failed for ${stop.name}`);
+                    }
+                }
+
+                // SORT BY ROUTE INDEX
+                // This ensures they appear exactly in the order they are encountered on the road
+                if (leg === 'onward') {
+                    validatedStops.sort((a, b) => a.routeIndex - b.routeIndex);
+                } else {
+                    // For return leg (Dest -> Source), we travel from Index MAX to Index 0.
+                    // So stops should be ordered Descending by Route Index.
+                    validatedStops.sort((a, b) => b.routeIndex - a.routeIndex);
+                }
+
+                return validatedStops;
+            };
+
+            let onwardStopsProcessed: AIGeneratedStop[] = [];
+            if (onwardResponse && onwardResponse.stops) {
+                onwardStopsProcessed = await processStops(
+                    onwardResponse.stops,
+                    'onward',
+                    source,
+                    destination,
+                    route.coordinates
+                );
+            }
+
+            if (onwardStopsProcessed.length > 0) {
+                const mappedOnward = convertAIStopsToStops(
+                    onwardStopsProcessed,
+                    route.coordinates,
+                    source,
+                    destination,
+                    route.distanceKm,
+                    'onward'
+                );
+                finalStops = [...finalStops, ...mappedOnward];
+            } else {
+                const fallback = generateStopsAlongRoute(route.coordinates, source, destination, route.distanceKm);
+                finalStops = [...finalStops, ...fallback];
+            }
+
+            // For Return Journey - logic to handle Round Trip correctly
+            if (tripType === 'round-trip') {
+                let returnStopsProcessed: AIGeneratedStop[] = [];
+
+                // If we got a specific return response, use it
+                if (returnResponse && returnResponse.stops) {
+                    returnStopsProcessed = await processStops(
+                        returnResponse.stops,
+                        'return',
+                        destination,
+                        source,
+                        route.coordinates // Using SAME coordinates (Source->Dest)
+                    );
+                } else if (onwardStopsProcessed.length > 0) {
+                    // Fallback: Use onward stops but reversed, maybe filtered?
+                    // For now, let's just reverse the onward stops so they make sense
+                    returnStopsProcessed = [...onwardStopsProcessed].reverse();
+                }
+
+                if (returnStopsProcessed.length > 0) {
+                    const mappedReturn = convertAIStopsToStops(
+                        returnStopsProcessed,
+                        route.coordinates,
+                        destination,
+                        source,
+                        route.distanceKm,
+                        'return'
+                    );
+
+                    const uniqueReturn = mappedReturn.map(s => ({
+                        ...s,
+                        id: `return-${s.id}`
+                    }));
+                    finalStops = [...finalStops, ...uniqueReturn];
+                }
+            }
+
+
+
+            // Set Night Halt
+            if (onwardResponse?.nightHalt) {
+                const midIndex = Math.floor(route.coordinates.length / 2);
+                setNightHaltSuggestion({
+                    location: route.coordinates[midIndex],
+                    suggestedCity: onwardResponse.nightHalt.city,
+                });
+            } else {
+                setNightHaltSuggestion(getMidpointForNightHalt(route.coordinates, route.distanceKm));
+            }
+
+            setStops(finalStops);
+            // Default select nothing or just start/end
+            setSelectedStops(finalStops.filter(s => s.type === 'start' || s.type === 'end'));
 
             // Calculate initial trip stats
-            const stats = calculateTripStats({
+            const initialStats = calculateTripStats({
                 totalDistanceKm: route.distanceKm,
                 durationMinutes: route.durationMinutes,
-                selectedStops: initialSelectedStops,
+                selectedStops: [],
                 baseFare,
                 perKmRate,
                 driverAllowancePerDay,
                 tripType,
             });
-            setTripStats(stats);
+            setTripStats(initialStats);
+
+            setScoutTip(`✨ Sarathi AI planned your ${tripType === 'round-trip' ? 'Round Trip' : 'Journey'} with ${finalStops.length} stops!`);
+
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
@@ -310,9 +449,14 @@ export function useTripLogic({
     useEffect(() => {
         if (!routeData) return;
 
+        const totalDetour = selectedStops.reduce((acc, stop) => {
+            if (stop.type === 'start' || stop.type === 'end') return acc;
+            return acc + (stop.detourKm || 20); // Default to 20km if detourKm not available
+        }, 0);
+
         const stats = calculateTripStats({
-            totalDistanceKm: routeData.distanceKm,
-            durationMinutes: routeData.durationMinutes,
+            totalDistanceKm: (routeData.distanceKm + totalDetour),
+            durationMinutes: routeData.durationMinutes + (totalDetour * 1.5), // Approx 1.5 min per km
             selectedStops,
             baseFare,
             perKmRate,

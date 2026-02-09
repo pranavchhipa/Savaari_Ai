@@ -45,23 +45,48 @@ export function calculateTripStats(input: TripStatsInput): TripStats {
         totalDays = Math.ceil(totalTripTimeHours / maxEffectiveHoursPerDay);
     }
 
-    // Pricing calculation
-    const includedKmPerDay = 250; // Base fare includes 250 km per day
-    const totalIncludedKm = includedKmPerDay * totalDays;
-    const extraKm = Math.max(0, effectiveDistance - totalIncludedKm);
-    const extraKmCharge = extraKm * perKmRate;
+    // --- Dynamic Pricing Calculation ---
+    // Standard Outstation Logic:
+    // 1. Min charge distance per day (e.g. 300km)
+    // 2. Round trip charges for return distance (already doubled effectively)
+    // 3. Driver allowance per day
 
-    // Driver allowance for extra days beyond first day
-    const baseDays = 1;
-    const extraDays = Math.max(0, totalDays - baseDays);
-    const driverAllowance = extraDays * driverAllowancePerDay;
+    const minKmPerDay = 300;
 
-    // Total fare
-    const totalFare = baseFare + extraKmCharge + driverAllowance;
+    // Billing Effective Distance
+    // Calculate billable distance: Max of (Actual Distance, Total Days * Min Km/Day)
+    const minBillableKm = totalDays * minKmPerDay;
+    const billableDistance = Math.max(effectiveDistance, minBillableKm);
 
-    // Suggest night halt if single-day trip time exceeds 8 hours
+    // Base Fare is effectively 0 in this dynamic model, or we can use it as a 'Booking Fee' if needed.
+    // But for "Actual Pricing", we usually just do Distance * Rate.
+    // If input baseFare is provided (from static data), we might ignore it or use it as a minimum floor.
+    // Let's rely on perKmRate.
+
+    const distanceCharge = billableDistance * perKmRate;
+
+    // Driver allowance
+    const driverAllowance = totalDays * driverAllowancePerDay;
+
+    // Total Fare
+    // We add a small platform fee or just uses the calc.
+    // For now: Distance Charge + Driver Allowance.
+    // If billableDistance > effectiveDistance, the "Extra Km" concept is slightly different.
+    // It's just "Billable Km".
+    // To match the UI fields:
+    // baseFare in UI could mean "Fixed Charge" or we can repurpose fields.
+    // Let's make:
+    // baseFare = Billable Distance * Rate (The core travel cost)
+    // extraKmCharge = 0 (since we already covered everything in baseFare/billable logic)
+    // driverAllowance = as calc.
+
+    const finalBaseFare = distanceCharge;
+    const finalTotalFare = finalBaseFare + driverAllowance;
+
+    // Suggest night halt if single-day trip time exceeds 12 hours (more realistic for India) or 
+    // if driving time is very long.
     let suggestedNightHalt: string | undefined;
-    if (driveTimeHours > 8 && totalDays > 1) {
+    if (driveTimeHours > 10 && totalDays > 1) {
         const midpointStop = actualStops[Math.floor(actualStops.length / 2)];
         if (midpointStop) {
             suggestedNightHalt = `Near ${midpointStop.name}`;
@@ -72,10 +97,10 @@ export function calculateTripStats(input: TripStatsInput): TripStats {
         totalDistanceKm: effectiveDistance,
         totalDriveTimeHours: driveTimeHours,
         totalDays,
-        baseFare,
-        extraKmCharge: Math.round(extraKmCharge),
+        baseFare: Math.round(finalBaseFare), // This now represents the Distance Charge
+        extraKmCharge: 0, // Simplified: Everything is in baseFare based on billable km
         driverAllowance,
-        totalFare: Math.round(totalFare),
+        totalFare: Math.round(finalTotalFare),
         suggestedNightHalt,
     };
 }

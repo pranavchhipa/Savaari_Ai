@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 // Sample car data
+// Sample car data with FALLBACK prices (approx 300km Trip) to avoid ₹0 flash
 const sampleCars: Car[] = [
     {
         id: '1',
@@ -33,10 +34,10 @@ const sampleCars: Car[] = [
         ac: true,
         rating: 4.7,
         reviewCount: 2341,
-        baseFare: 8499,
-        perKmRate: 11,
+        baseFare: 3900, // Fallback
+        perKmRate: 12,
         driverAllowancePerDay: 300,
-        features: ['Driver Allowance Included', 'Fuel Included', 'Toll Included'],
+        features: ['Fuel Included', 'Toll Included in Est.'],
     },
     {
         id: '2',
@@ -47,10 +48,10 @@ const sampleCars: Car[] = [
         ac: true,
         rating: 4.8,
         reviewCount: 3892,
-        baseFare: 12363,
-        perKmRate: 12,
-        driverAllowancePerDay: 350,
-        features: ['Driver Allowance Included', 'Comfortable Ride', 'Spacious Boot'],
+        baseFare: 4500, // Fallback
+        perKmRate: 14,
+        driverAllowancePerDay: 300,
+        features: ['Comfortable Ride', 'Spacious Boot'],
     },
     {
         id: '3',
@@ -61,27 +62,13 @@ const sampleCars: Car[] = [
         ac: true,
         rating: 4.6,
         reviewCount: 1567,
-        baseFare: 13499,
-        perKmRate: 12,
+        baseFare: 4850, // Fallback
+        perKmRate: 15,
         driverAllowancePerDay: 350,
-        features: ['Premium Interior', 'USB Charging', 'Extra Legroom'],
+        features: ['Premium Interior', 'Extra Legroom'],
     },
     {
         id: '4',
-        name: 'Toyota Innova',
-        image: '/cars/innova.png',
-        type: 'SUV',
-        seats: 7,
-        ac: true,
-        rating: 4.9,
-        reviewCount: 5234,
-        baseFare: 17863,
-        perKmRate: 15,
-        driverAllowancePerDay: 400,
-        features: ['Captain Seats', 'Best for Families', 'Ample Luggage Space'],
-    },
-    {
-        id: '5',
         name: 'Maruti Ertiga',
         image: '/cars/ertiga.png',
         type: 'MUV',
@@ -89,10 +76,24 @@ const sampleCars: Car[] = [
         ac: true,
         rating: 4.5,
         reviewCount: 1893,
-        baseFare: 14999,
-        perKmRate: 13,
-        driverAllowancePerDay: 350,
-        features: ['Great Mileage', '7 Seater', 'Comfortable Journey'],
+        baseFare: 5800, // Fallback
+        perKmRate: 18,
+        driverAllowancePerDay: 400,
+        features: ['Great for Groups', '7 Seater'],
+    },
+    {
+        id: '5',
+        name: 'Toyota Innova Crysta',
+        image: '/cars/innova.png',
+        type: 'SUV',
+        seats: 7,
+        ac: true,
+        rating: 4.9,
+        reviewCount: 5234,
+        baseFare: 7100, // Fallback
+        perKmRate: 22,
+        driverAllowancePerDay: 500,
+        features: ['Captain Seats', 'Luxury Comfort', 'Ample Luggage'],
     },
 ];
 
@@ -114,42 +115,27 @@ export default function ListingPage() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('round-trip');
     const [pickupDate, setPickupDate] = useState<string>('');
+    const [dropDate, setDropDate] = useState<string>('');
+    const [pickupTime, setPickupTime] = useState<string>('09:00');
     const [filters, setFilters] = useState<FilterState>({
         carTypes: [],
         minSeats: 0,
         maxPrice: 50000,
     });
 
-    // Load search params from sessionStorage
-    useEffect(() => {
-        const stored = sessionStorage.getItem('savaari_search');
-        if (stored) {
-            try {
-                const params = JSON.parse(stored) as SearchParams;
-                setSearchParams(params);
-                setTripType(params.tripType || 'round-trip');
-                setPickupDate(params.pickupDate || new Date().toISOString().split('T')[0]);
-            } catch (e) {
-                console.error('Failed to parse search params');
-                setPickupDate(new Date().toISOString().split('T')[0]);
-            }
-        } else {
-            setPickupDate(new Date().toISOString().split('T')[0]);
-        }
-
-        // Simulate network delay
-        setTimeout(() => {
-            setIsLoading(false);
-        }, 1500);
-    }, []);
-
     // Save to sessionStorage when trip type or date changes
     useEffect(() => {
         if (!isLoading && searchParams) {
-            const updated = { ...searchParams, tripType, pickupDate };
+            const updated = { ...searchParams, tripType, pickupDate, dropDate, pickupTime };
             sessionStorage.setItem('savaari_search', JSON.stringify(updated));
         }
-    }, [tripType, pickupDate, isLoading]);
+
+        // Also trigger re-calculation if tripType changes?
+        // Ideally yes, but for now let's keep it simple.
+    }, [tripType, pickupDate, dropDate, pickupTime, isLoading, searchParams]);
+
+    const [cars, setCars] = useState<Car[]>(sampleCars);
+    const [routeData, setRouteData] = useState<{ distanceKm: number, durationMinutes: number } | null>(null);
 
     // Default locations if not set
     const source: Location = searchParams?.source || {
@@ -166,9 +152,109 @@ export default function ListingPage() {
         lng: 76.6394,
     };
 
+    // 1. Initial Load: Fetch Route
+    useEffect(() => {
+        const loadRoute = async () => {
+            let currentSource = source;
+            let currentDest = destination;
+
+            // Load params from session if available
+            if (typeof window !== 'undefined') {
+                const stored = sessionStorage.getItem('savaari_search');
+                if (stored) {
+                    try {
+                        const params = JSON.parse(stored) as SearchParams;
+                        setSearchParams(params);
+                        if (params.source) currentSource = params.source;
+                        if (params.destination) currentDest = params.destination;
+
+                        // Also restore other states
+                        if (params.tripType) setTripType(params.tripType);
+                        if (params.pickupDate) setPickupDate(params.pickupDate);
+                        if (params.dropDate) setDropDate(params.dropDate || '');
+                        if (params.pickupTime) setPickupTime(params.pickupTime || '09:00');
+                    } catch (e) {
+                        console.error('Failed to parse search params');
+                    }
+                }
+            }
+
+            // EAGER CALCULATION: Set approximate distance immediately to show realistic prices
+            // while waiting for the precise route API
+            import('@/lib/geoUtils').then(({ getDistance }) => {
+                const straightLineKm = getDistance(currentSource, currentDest);
+                const estimatedRoadKm = straightLineKm * 1.35; // Estimation factor
+                const estimatedDurationMin = (estimatedRoadKm / 45) * 60;
+
+                // Only set if we don't have precise data yet
+                setRouteData(prev => prev || {
+                    distanceKm: estimatedRoadKm,
+                    durationMinutes: estimatedDurationMin
+                });
+            });
+
+            try {
+                const { getRoute } = await import('@/lib/routing');
+                console.log("Fetching route for:", currentSource.name, "to", currentDest.name);
+                const data = await getRoute(currentSource, currentDest);
+
+                if (data) {
+                    setRouteData({
+                        distanceKm: data.distanceKm,
+                        durationMinutes: data.durationMinutes
+                    });
+                } else {
+                    console.warn("No route data found.");
+                }
+            } catch (e) {
+                console.error("Route fetch failed", e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadRoute();
+    }, []);
+
+    // 2. Pricing Effect: Recalculate when Route or Trip Type changes
+    useEffect(() => {
+        const calculatePrices = async () => {
+            const currentRouteData = routeData;
+            if (!currentRouteData) return;
+
+            try {
+                const { calculateTripStats } = await import('@/lib/calculateTripStats');
+
+                const updatedCars = sampleCars.map(car => {
+                    const stats = calculateTripStats({
+                        totalDistanceKm: currentRouteData.distanceKm,
+                        durationMinutes: currentRouteData.durationMinutes,
+                        selectedStops: [],
+                        baseFare: 0,
+                        perKmRate: car.perKmRate,
+                        driverAllowancePerDay: car.driverAllowancePerDay,
+                        tripType: tripType
+                    });
+
+                    return {
+                        ...car,
+                        baseFare: stats.totalFare
+                    };
+                });
+                setCars(updatedCars);
+            } catch (e) {
+                console.error("Price recalc failed", e);
+            }
+        };
+
+        calculatePrices();
+    }, [routeData, tripType]);
+
+
+
     // Sort and filter cars
     const filteredAndSortedCars = useMemo(() => {
-        let result = [...sampleCars];
+        let result = [...cars];
 
         // Apply filters
         if (filters.carTypes.length > 0) {
@@ -265,6 +351,18 @@ export default function ListingPage() {
                                     </div>
                                     <span className="font-semibold">{destination.name}</span>
                                 </div>
+
+                                {tripType === 'round-trip' && (
+                                    <>
+                                        <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <div className="flex items-center gap-2 text-gray-800">
+                                            <div className="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
+                                                <MapPin className="w-4 h-4 text-white" />
+                                            </div>
+                                            <span className="font-semibold">{source.name}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -563,6 +661,8 @@ export default function ListingPage() {
                                     destination={destination}
                                     tripType={tripType}
                                     pickupDate={pickupDate}
+                                    dropDate={dropDate}
+                                    pickupTime={pickupTime}
                                 />
                             </motion.div>
                         ))

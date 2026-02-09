@@ -18,6 +18,8 @@ interface JourneyHeaderProps {
     source: Location;
     destination: Location;
     pickupDate: string;
+    dropDate?: string;
+    pickupTime?: string;
     tripType: 'one-way' | 'round-trip';
     totalDays: number;
     totalDistanceKm: number;
@@ -29,6 +31,8 @@ export default function JourneyHeader({
     source,
     destination,
     pickupDate,
+    dropDate,
+    pickupTime,
     tripType,
     totalDays,
     totalDistanceKm,
@@ -49,6 +53,14 @@ export default function JourneyHeader({
 
     // Calculate arrival date
     const getArrivalDate = () => {
+        if (dropDate) {
+            const date = new Date(dropDate);
+            return date.toLocaleDateString('en-IN', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+            });
+        }
         const date = new Date(pickupDate);
         date.setDate(date.getDate() + totalDays - 1);
         return date.toLocaleDateString('en-IN', {
@@ -128,7 +140,7 @@ export default function JourneyHeader({
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 px-3 py-1 rounded-full border border-slate-600">
                             <div className="flex items-center gap-2 text-slate-400">
                                 <Navigation className="w-4 h-4 rotate-90" />
-                                <span className="text-xs font-medium">{Math.round(totalDistanceKm)} km</span>
+                                <span className="text-xs font-medium">{Math.round(tripType === 'round-trip' ? totalDistanceKm / 2 : totalDistanceKm)} km</span>
                             </div>
                         </div>
                     </div>
@@ -153,6 +165,45 @@ export default function JourneyHeader({
                             <MapPin className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
                         </div>
                     </div>
+
+                    {/* Round Trip Return - Desktop Only for layout balance */}
+                    {tripType === 'round-trip' && (
+                        <>
+                            {/* Animated Route Line 2 - Return */}
+                            <div className="hidden md:flex flex-1 mx-6 relative">
+                                <div className="w-full h-px bg-gradient-to-r from-orange-400 via-slate-500 to-blue-400 relative">
+                                    <motion.div
+                                        animate={{ x: ['0%', '100%'] }}
+                                        transition={{
+                                            duration: 3,
+                                            repeat: Infinity,
+                                            ease: 'linear',
+                                            delay: 1.5
+                                        }}
+                                        className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-lg shadow-white/50"
+                                    />
+                                    {/* Distance Pill for Return */}
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-900/30 px-3 py-1 rounded-full border border-blue-800/50 backdrop-blur-sm z-10">
+                                        <div className="flex items-center gap-2">
+                                            <Navigation className="w-4 h-4 rotate-90 text-blue-400" />
+                                            <span className="text-xs font-medium text-blue-400">{Math.round(totalDistanceKm / 2)} km</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Return Source */}
+                            <div className="hidden md:flex items-center gap-3">
+                                <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-blue-400/30">
+                                    <MapPin className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-blue-300 uppercase tracking-wider font-medium">Return</p>
+                                    <h3 className="text-lg md:text-xl font-bold text-white truncate max-w-[150px] md:max-w-none">{source.name}</h3>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Journey Details Row */}

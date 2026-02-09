@@ -30,6 +30,8 @@ interface ScoutContainerProps {
     tripType: 'one-way' | 'round-trip';
     onPriceUpdate: (newPrice: number) => void;
     pickupDate?: string;
+    dropDate?: string;
+    pickupTime?: string;
     onDestinationChange?: (newDestination: Location) => void;
     onTripStatsUpdate?: (tripStats: TripStats, selectedStops: Stop[]) => void;
 }
@@ -41,6 +43,8 @@ export default function ScoutContainer({
     tripType,
     onPriceUpdate,
     pickupDate = new Date().toISOString().split('T')[0],
+    dropDate,
+    pickupTime,
     onDestinationChange,
     onTripStatsUpdate,
 }: ScoutContainerProps) {
@@ -66,6 +70,9 @@ export default function ScoutContainer({
         baseFare: car.baseFare,
         perKmRate: car.perKmRate,
         driverAllowancePerDay: car.driverAllowancePerDay,
+        pickupDate,
+        dropDate,
+        pickupTime,
     });
 
     // Update parent with new price when tripStats changes
@@ -137,8 +144,27 @@ export default function ScoutContainer({
     const journeyDays = useMemo(() => {
         if (!tripStats || stops.length === 0) return [];
 
-        const totalDays = tripStats.totalDays;
-        const stopsPerDay = Math.ceil(stops.length / totalDays);
+        const isRoundTrip = tripType === 'round-trip';
+        const totalTripDays = tripStats.totalDays;
+
+        // Split stops by leg
+        const onwardStops = stops.filter(s => s.leg !== 'return');
+        const returnStops = stops.filter(s => s.leg === 'return');
+
+        // Determine days distribution
+        let onwardDaysCount = totalTripDays;
+        let returnDaysCount = 0;
+
+        if (isRoundTrip) {
+            if (totalTripDays === 1) {
+                onwardDaysCount = 1;
+                returnDaysCount = 1;
+            } else {
+                onwardDaysCount = Math.ceil(totalTripDays / 2);
+                returnDaysCount = totalTripDays - onwardDaysCount;
+            }
+        }
+
         const days: Array<{
             dayNumber: number;
             date: string;
@@ -149,32 +175,75 @@ export default function ScoutContainer({
             nightHalt?: string;
         }> = [];
 
-        for (let day = 0; day < totalDays; day++) {
-            const startIdx = day * stopsPerDay;
-            const endIdx = Math.min(startIdx + stopsPerDay + 1, stops.length);
-            const dayStops = stops.slice(startIdx, endIdx);
-            const daySegments = journeySegments.slice(startIdx, endIdx - 1);
+        // --- Generate Onward Days ---
+        // Calculate stops per day for onward leg
+        const onwardStopsPerDay = Math.ceil(onwardStops.length / onwardDaysCount);
+
+        for (let day = 0; day < onwardDaysCount; day++) {
+            const startIdx = day * onwardStopsPerDay;
+            const endIdx = Math.min(startIdx + onwardStopsPerDay, onwardStops.length);
+            const dayStops = onwardStops.slice(startIdx, endIdx);
+
+            // Segments for this day - simplistic slicing of all segments?
+            // Since segments are generated from full stops list, we need to map them.
+            // But simpler: just accept dayStops and recalculate simplistic distance for UI
+            // or try to match them.
+            // For now, let's just pass empty segments or filter broadly.
+            // Actually, let's reuse the segment logic but filter it.
+            const daySegments = journeySegments.filter(js => dayStops.includes(js.fromStop));
 
             // Calculate day date
             const date = new Date(pickupDate);
             date.setDate(date.getDate() + day);
 
-            const totalDayDistance = daySegments.reduce((sum, s) => sum + s.distanceKm, 0);
-            const totalDayTime = daySegments.reduce((sum, s) => sum + s.durationMinutes, 0);
+            // Distance & Time
+            const dayDistance = daySegments.reduce((sum, s) => sum + s.distanceKm, 0);
+            const dayTime = daySegments.reduce((sum, s) => sum + s.durationMinutes, 0);
 
             days.push({
                 dayNumber: day + 1,
                 date: date.toISOString().split('T')[0],
                 stops: dayStops,
                 segments: daySegments,
-                totalDriveTimeMinutes: totalDayTime,
-                totalDistanceKm: totalDayDistance,
-                nightHalt: day < totalDays - 1 ? nightHaltSuggestion?.suggestedCity : undefined,
+                totalDriveTimeMinutes: dayTime > 0 ? dayTime : (tripStats.totalDriveTimeHours * 60 / totalTripDays), // Fallback
+                totalDistanceKm: dayDistance > 0 ? dayDistance : (tripStats.totalDistanceKm / (isRoundTrip ? 2 : 1) / onwardDaysCount),
+                nightHalt: day < onwardDaysCount - 1 ? nightHaltSuggestion?.suggestedCity : undefined,
             });
         }
 
+        // --- Generate Return Days ---
+        if (isRoundTrip) {
+            const returnStopsPerDay = Math.max(1, Math.ceil(returnStops.length / returnDaysCount));
+
+            for (let i = 0; i < returnDaysCount; i++) {
+                const dayNum = (totalTripDays === 1 ? 1 : onwardDaysCount + i + 1);
+                const startIdx = i * returnStopsPerDay;
+                const endIdx = Math.min(startIdx + returnStopsPerDay, returnStops.length);
+                const dayStops = returnStops.slice(startIdx, endIdx);
+
+                const daySegments = journeySegments.filter(js => dayStops.includes(js.fromStop));
+
+                // Calculate date: if single day trip, same as pickup. Else offset.
+                const dayOffset = (totalTripDays === 1 ? 0 : onwardDaysCount + i);
+                const date = new Date(pickupDate);
+                date.setDate(date.getDate() + dayOffset);
+
+                const dayDistance = daySegments.reduce((sum, s) => sum + s.distanceKm, 0);
+
+                days.push({
+                    dayNumber: dayNum,
+                    date: date.toISOString().split('T')[0],
+                    stops: dayStops,
+                    segments: daySegments,
+                    totalDriveTimeMinutes: 0, // Simplified for return
+                    totalDistanceKm: dayDistance > 0 ? dayDistance : (tripStats.totalDistanceKm / 2 / returnDaysCount),
+                    nightHalt: i < returnDaysCount - 1 ? 'En route' : undefined,
+                });
+            }
+        }
+
         return days;
-    }, [stops, tripStats, journeySegments, pickupDate, nightHaltSuggestion]);
+    }, [stops, tripStats, journeySegments, pickupDate, nightHaltSuggestion, tripType]);
 
     // Handle destination change
     const handleDestinationChange = useCallback((newDestination: Location) => {
@@ -223,6 +292,8 @@ export default function ScoutContainer({
                     source={source}
                     destination={currentDestination}
                     pickupDate={pickupDate}
+                    dropDate={dropDate}
+                    pickupTime={pickupTime}
                     tripType={tripType}
                     totalDays={tripStats.totalDays}
                     totalDistanceKm={tripStats.totalDistanceKm}

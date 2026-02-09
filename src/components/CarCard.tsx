@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { Car, Location, TripStats, Stop } from '@/types';
@@ -24,15 +24,22 @@ interface CarCardProps {
     destination: Location;
     tripType: 'one-way' | 'round-trip';
     pickupDate?: string;
+    dropDate?: string;
+    pickupTime?: string;
 }
 
-export default function CarCard({ car, source, destination, tripType, pickupDate }: CarCardProps) {
+export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime }: CarCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [currentPrice, setCurrentPrice] = useState(car.baseFare);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [currentTripStats, setCurrentTripStats] = useState<TripStats | null>(null);
     const [currentStops, setCurrentStops] = useState<Stop[]>([]);
     const [currentDestination, setCurrentDestination] = useState(destination);
+
+    // Sync local price state with incoming prop updates (e.g. when ListingPage recalculates fares)
+    useEffect(() => {
+        setCurrentPrice(car.baseFare);
+    }, [car.baseFare]);
 
     const handlePriceUpdate = useCallback((newPrice: number) => {
         setCurrentPrice(newPrice);
@@ -76,8 +83,8 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                     <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                         {/* Car Image */}
                         <div className="flex-shrink-0 w-full md:w-48 h-36 md:h-32 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            { }
+                            { }
                             <div className="absolute inset-0 p-2">
                                 <Image
                                     src={car.image || '/placeholder-car.png'}
@@ -211,6 +218,8 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                                     tripType={tripType}
                                     onPriceUpdate={handlePriceUpdate}
                                     pickupDate={pickupDate}
+                                    dropDate={dropDate}
+                                    pickupTime={pickupTime}
                                     onDestinationChange={handleDestinationChange}
                                     onTripStatsUpdate={handleTripStatsUpdate}
                                 />
@@ -247,6 +256,8 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                 tripStats={defaultTripStats}
                 selectedStops={currentStops}
                 pickupDate={pickupDate || new Date().toISOString().split('T')[0]}
+                dropDate={dropDate}
+                pickupTime={pickupTime || '09:00'}
             />
         </>
     );

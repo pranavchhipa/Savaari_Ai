@@ -7,8 +7,8 @@
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Using GPT-4o-mini for fast, quality responses
-const AI_MODEL = 'openai/gpt-4o-mini';
+// Using GPT-4o for maximum reliability and reasoning (User requested 'Best')
+const AI_MODEL = 'openai/gpt-4o';
 
 interface PlaceInfo {
     description: string;
@@ -272,6 +272,7 @@ export interface AIGeneratedStop {
     approximateKm: number;
     suggestedDuration: number;
     famousFor?: string;
+    detourKm?: number;
 }
 
 export interface AIRouteStopsResponse {
@@ -310,39 +311,42 @@ export async function generateRouteStops(
 
     const needsNightHalt = distanceKm > 400;
 
-    const prompt = `You are an expert Indian travel planner. For a road trip from "${source}" to "${destination}" (approximately ${Math.round(distanceKm)} km):
+    const prompt = `You are an expert Indian travel planner and geographer. For a road trip from "${source}" to "${destination}" (approximately ${Math.round(distanceKm)} km):
 
-Generate 4-6 REAL, FAMOUS stops that travelers would actually want to visit along this specific route. These must be REAL places that exist on or near this highway route.
-
-Include a good mix of:
-- 1-2 heritage/tourist attractions (temples, forts, caves, monuments)
-- 1-2 famous food stops (well-known dhabas, restaurants along highways)
-- 1 scenic viewpoint or natural attraction if applicable
-- 1 well-known rest stop or fuel station area
-
-${needsNightHalt ? `Since this is a long journey (${Math.round(distanceKm)} km), also suggest a night halt city roughly midway.` : ''}
-
-CRITICAL: Only suggest places that ACTUALLY EXIST on this route. Include approximate distance from ${source}.
-
-Respond in this exact JSON format (no markdown, just valid JSON):
-{
-    "stops": [
-        {
-            "name": "Exact Place Name",
-            "type": "heritage|viewpoint|restaurant|food|fuel|rest",
-            "description": "Brief 1-line description",
-            "whyVisit": "Compelling reason in 10 words max",
-            "approximateKm": 150,
-            "suggestedDuration": 60,
-            "famousFor": "What it's known for"
-        }
-    ]${needsNightHalt ? `,
-    "nightHalt": {
-        "city": "City Name",
-        "reason": "Why this is a good overnight stop",
-        "approximateKm": ${Math.round(distanceKm / 2)}
-    }` : ''}
-}`;
+    Generate 10-12 REAL, HIGH-QUALITY stops that travelers would actually want to visit along this specific route.
+    
+    STRICT RULES:
+    1. Stops must be BETWEEN "${source}" and "${destination}" in the direction of travel.
+    2. Stops must be within 50km radius of the main highway route.
+    3. Do NOT suggest stops that require significant backtracking.
+    4. Focus on: 
+       - Famous Highway Dhabas/Food Courts (Real names only)
+       - Scenic Viewpoints & Nature Spots
+       - Historic Temples & Heritage Sites
+       - Clean Rest Stops for families
+    
+    ${needsNightHalt ? `Since this is a long journey (${Math.round(distanceKm)} km), also identify the BEST city for a night halt roughly midway.` : ''}
+    
+    Respond in this exact JSON format (no markdown, just valid JSON):
+    {
+        "stops": [
+            {
+                "name": "Exact Name",
+                "type": "heritage|viewpoint|restaurant|food|fuel|rest",
+                "description": "Engaging description",
+                "whyVisit": "Compelling reason",
+                "approximateKm": 150,
+                "detourKm": 5,
+                "suggestedDuration": 60,
+                "famousFor": "Famous feature"
+            }
+        ]${needsNightHalt ? `,
+        "nightHalt": {
+            "city": "City Name",
+            "reason": "Why this is a good stop",
+            "approximateKm": ${Math.round(distanceKm / 2)}
+        }` : ''}
+    }`;
 
     try {
         const response = await fetch(OPENROUTER_API_URL, {

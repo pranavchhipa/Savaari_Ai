@@ -16,6 +16,8 @@ export interface Stop {
   isSelected?: boolean;
   suggestedTime?: string;
   description?: string;
+  detourKm?: number;
+  leg?: 'onward' | 'return';
 }
 
 export interface TripDay {
@@ -76,6 +78,8 @@ export interface SearchParams {
   source: Location | null;
   destination: Location | null;
   pickupDate: string;
+  dropDate?: string;
+  pickupTime?: string;
   tripType: 'one-way' | 'round-trip';
 }
 

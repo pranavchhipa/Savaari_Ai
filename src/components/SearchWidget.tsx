@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Calendar, ArrowRight, Search, X, ArrowLeftRight, ArrowUpDown } from 'lucide-react';
+import { MapPin, Calendar, ArrowRight, Search, X, ArrowLeftRight, ArrowUpDown, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Location } from '@/types';
 import { searchLocations, popularCities } from '@/lib/geocoding';
@@ -18,6 +18,8 @@ export default function SearchWidget() {
     const [showSourceDropdown, setShowSourceDropdown] = useState(false);
     const [showDestDropdown, setShowDestDropdown] = useState(false);
     const [pickupDate, setPickupDate] = useState('');
+    const [dropDate, setDropDate] = useState('');
+    const [pickupTime, setPickupTime] = useState('09:00');
     const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('round-trip');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -30,6 +32,11 @@ export default function SearchWidget() {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         setPickupDate(tomorrow.toISOString().split('T')[0]);
+
+        // Default return date to day after tomorrow
+        const dayAfter = new Date(tomorrow);
+        dayAfter.setDate(dayAfter.getDate() + 1);
+        setDropDate(dayAfter.toISOString().split('T')[0]);
     }, []);
 
     // Close dropdowns when clicking outside
@@ -111,22 +118,51 @@ export default function SearchWidget() {
         setDestQuery(tempQuery);
     };
 
-    const handleSubmit = () => {
-        if (!source || !destination || !pickupDate) {
-            alert('Please fill all fields');
-            return;
+    const handleSubmit = async () => {
+        setIsLoading(true);
+        try {
+            let finalSource = source;
+            let finalDest = destination;
+
+            // Smart Resolve: If user typed but didn't select, try to find the location
+            if (!finalSource && sourceQuery.length > 2) {
+                const results = await searchLocations(sourceQuery);
+                if (results.length > 0) {
+                    finalSource = results[0];
+                    setSource(finalSource);
+                }
+            }
+
+            if (!finalDest && destQuery.length > 2) {
+                const results = await searchLocations(destQuery);
+                if (results.length > 0) {
+                    finalDest = results[0];
+                    setDestination(finalDest);
+                }
+            }
+
+            if (!finalSource || !finalDest || !pickupDate) {
+                alert('Please select valid locations from the list');
+                setIsLoading(false);
+                return;
+            }
+
+            // Store search params in sessionStorage
+            const searchParams = {
+                source: finalSource,
+                destination: finalDest,
+                pickupDate,
+                tripType,
+                dropDate: tripType === 'round-trip' ? dropDate : undefined,
+                pickupTime,
+            };
+            sessionStorage.setItem('savaari_search', JSON.stringify(searchParams));
+
+            router.push('/listing');
+        } catch (error) {
+            console.error("Search failed", error);
+            setIsLoading(false);
         }
-
-        // Store search params in sessionStorage
-        const searchParams = {
-            source,
-            destination,
-            pickupDate,
-            tripType,
-        };
-        sessionStorage.setItem('savaari_search', JSON.stringify(searchParams));
-
-        router.push('/listing');
     };
 
     return (
@@ -178,7 +214,7 @@ export default function SearchWidget() {
                 <div className="relative grid grid-cols-1 md:grid-cols-12 gap-y-6 gap-x-4 items-center">
 
                     {/* Source Input */}
-                    <div ref={sourceRef} className="md:col-span-4 lg:col-span-4 relative group">
+                    <div ref={sourceRef} className="md:col-span-4 lg:col-span-5 relative group">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
                             Pickup Location
                         </label>
@@ -220,7 +256,7 @@ export default function SearchWidget() {
                                     transition={{ duration: 0.15 }}
                                     className="absolute top-full left-0 right-0 mt-3 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 z-50 max-h-[320px] overflow-y-auto scrollbar-thin"
                                 >
-                                    {isLoading ? (
+                                    {isLoading && !sourceSuggestions.length ? (
                                         <div className="p-8 text-center text-gray-500">
                                             <div className="animate-spin w-6 h-6 border-2 border-[#2563EB] border-t-transparent rounded-full mx-auto mb-2"></div>
                                             <span className="text-sm">Finding locations...</span>
@@ -260,7 +296,7 @@ export default function SearchWidget() {
                     </div>
 
                     {/* Swap Button (Desktop) */}
-                    <div className="hidden md:flex md:col-span-1 justify-center pt-6 relative z-10">
+                    <div className="hidden md:flex md:col-span-2 justify-center pt-6 relative z-10">
                         <motion.button
                             whileHover={{ scale: 1.1, rotate: 180 }}
                             whileTap={{ scale: 0.9 }}
@@ -285,7 +321,7 @@ export default function SearchWidget() {
                     </div>
 
                     {/* Destination Input */}
-                    <div ref={destRef} className="md:col-span-4 lg:col-span-4 relative group">
+                    <div ref={destRef} className="md:col-span-4 lg:col-span-5 relative group">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
                             Drop Location
                         </label>
@@ -327,7 +363,7 @@ export default function SearchWidget() {
                                     transition={{ duration: 0.15 }}
                                     className="absolute top-full left-0 right-0 mt-3 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 z-50 max-h-[320px] overflow-y-auto scrollbar-thin"
                                 >
-                                    {isLoading ? (
+                                    {isLoading && !destSuggestions.length ? (
                                         <div className="p-8 text-center text-gray-500">
                                             <div className="animate-spin w-6 h-6 border-2 border-[#F97316] border-t-transparent rounded-full mx-auto mb-2"></div>
                                             <span className="text-sm">Finding locations...</span>
@@ -366,13 +402,17 @@ export default function SearchWidget() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Date Picker */}
-                    <div className="md:col-span-3 lg:col-span-3 group">
+                </div>
+
+                {/* Second Row: Dates & Time */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-y-6 gap-x-4 items-start mt-6">
+                    {/* Pickup Date */}
+                    <div className={`${tripType === 'round-trip' ? 'md:col-span-4' : 'md:col-span-6'} relative group`}>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
                             Pickup Date
                         </label>
                         <div className="relative">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 group-focus-within:bg-purple-600 group-focus-within:text-white transition-all duration-300 shadow-sm pointer-events-none">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 pointer-events-none">
                                 <Calendar className="w-5 h-5" />
                             </div>
                             <input
@@ -385,19 +425,58 @@ export default function SearchWidget() {
                         </div>
                     </div>
 
-                    {/* Search Button (Desktop) */}
-                    {/* <div className="hidden lg:block lg:col-span-2 pt-6">
-                        <motion.button
-                            whileHover={{ scale: 1.02, boxShadow: "0 20px 25px -5px rgb(249 115 22 / 0.4)" }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleSubmit}
-                            disabled={!source || !destination}
-                            className="w-full h-[56px] bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white rounded-xl font-bold text-lg shadow-xl shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                        >
-                            <Search className="w-5 h-5" />
-                            <span>Search</span>
-                        </motion.button>
-                    </div> */}
+                    {/* Pickup Time */}
+                    <div className={`${tripType === 'round-trip' ? 'md:col-span-4' : 'md:col-span-6'} relative group`}>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
+                            Pickup Time
+                        </label>
+                        <div className="relative">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 pointer-events-none">
+                                <Clock className="w-5 h-5" />
+                            </div>
+                            <select
+                                value={pickupTime}
+                                onChange={(e) => setPickupTime(e.target.value)}
+                                className="glass-input w-full pl-16 pr-4 py-4 rounded-xl text-gray-800 font-medium focus:outline-none cursor-pointer appearance-none bg-white"
+                            >
+                                {Array.from({ length: 48 }).map((_, i) => {
+                                    const h = Math.floor(i / 2);
+                                    const m = i % 2 === 0 ? '00' : '30';
+                                    const time = `${h.toString().padStart(2, '0')}:${m}`;
+                                    const label = new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                                    return <option key={time} value={time}>{label}</option>;
+                                })}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Drop Date (Round Trip Only) */}
+                    <AnimatePresence>
+                        {tripType === 'round-trip' && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="md:col-span-4 relative group"
+                            >
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
+                                    Return Date
+                                </label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-pink-600 pointer-events-none">
+                                        <Calendar className="w-5 h-5" />
+                                    </div>
+                                    <input
+                                        type="date"
+                                        value={dropDate}
+                                        onChange={(e) => setDropDate(e.target.value)}
+                                        min={pickupDate}
+                                        className="glass-input w-full pl-16 pr-4 py-4 rounded-xl text-gray-800 font-medium focus:outline-none cursor-pointer"
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* Big Search Button (Full Width on Mobile, Bottom on Desktop for impact) */}
@@ -406,15 +485,18 @@ export default function SearchWidget() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleSubmit}
-                        disabled={!source || !destination}
-                        className="w-full md:w-auto md:min-w-[300px] h-14 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#3B82F6] hover:to-[#2563EB] disabled:from-blue-200 disabled:to-blue-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-blue-600/30 disabled:shadow-none transition-all flex items-center justify-center gap-3 relative overflow-hidden group"
+                        className="w-full md:w-auto md:min-w-[300px] h-14 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#3B82F6] hover:to-[#2563EB] text-white rounded-xl font-bold text-lg shadow-xl shadow-blue-600/30 transition-all flex items-center justify-center gap-3 relative overflow-hidden group"
                     >
                         {/* Shimmer Effect */}
                         <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 group-hover:animate-scout-shimmer" />
 
-                        <Search className="w-6 h-6" />
-                        <span>Search Cabs</span>
-                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        {isLoading ? (
+                            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Search className="w-6 h-6" />
+                        )}
+                        <span>{isLoading ? 'Searching...' : 'Search Cabs'}</span>
+                        {!isLoading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
                     </motion.button>
                 </div>
             </div>
