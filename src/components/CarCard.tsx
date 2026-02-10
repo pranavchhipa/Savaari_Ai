@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { Car, Location, TripStats, Stop } from '@/types';
-import ScoutContainer from './ScoutContainer';
+import PlanningModal from './PlanningModal';
 import BookingModal from './BookingModal';
 import { formatCurrency } from '@/lib/calculateTripStats';
 import {
@@ -12,10 +12,9 @@ import {
     Users,
     Wind,
     CheckCircle,
-    ChevronDown,
-    ChevronUp,
     Sparkles,
     Briefcase,
+    ArrowRight,
 } from 'lucide-react';
 
 interface CarCardProps {
@@ -29,40 +28,17 @@ interface CarCardProps {
 }
 
 export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime }: CarCardProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [currentPrice, setCurrentPrice] = useState(car.baseFare);
+    const [showPlanningModal, setShowPlanningModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
-    const [currentTripStats, setCurrentTripStats] = useState<TripStats | null>(null);
-    const [currentStops, setCurrentStops] = useState<Stop[]>([]);
-    const [currentDestination, setCurrentDestination] = useState(destination);
+    const [currentPrice, setCurrentPrice] = useState(car.baseFare);
 
-    // Sync local price state with incoming prop updates (e.g. when ListingPage recalculates fares)
+    // Sync local price state with incoming prop updates
     useEffect(() => {
         setCurrentPrice(car.baseFare);
     }, [car.baseFare]);
 
-    const handlePriceUpdate = useCallback((newPrice: number) => {
-        setCurrentPrice(newPrice);
-    }, []);
-
-    // Callback to receive tripStats from ScoutContainer
-    const handleTripStatsUpdate = useCallback((tripStats: TripStats, selectedStops: Stop[]) => {
-        setCurrentTripStats(tripStats);
-        setCurrentStops(selectedStops);
-    }, []);
-
-    const handleDestinationChange = useCallback((newDest: Location) => {
-        setCurrentDestination(newDest);
-    }, []);
-
-    const handleConfirmBooking = () => {
-        if (currentTripStats) {
-            setShowBookingModal(true);
-        }
-    };
-
-    // Generate default tripStats if not available yet
-    const defaultTripStats: TripStats = currentTripStats || {
+    // Generate default tripStats for direct booking (without customization)
+    const defaultTripStats: TripStats = {
         totalDistanceKm: 0,
         totalDriveTimeHours: 0,
         totalDays: 1,
@@ -146,10 +122,20 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Plan My Perfect Trip CTA — positioned below features */}
+                            <button
+                                onClick={() => setShowPlanningModal(true)}
+                                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 text-[#2563EB] border border-blue-200/60 hover:from-blue-100 hover:via-indigo-100 hover:to-purple-100 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100/50 transition-all duration-300 group"
+                            >
+                                <Sparkles className="w-4 h-4 text-indigo-500 group-hover:animate-pulse" />
+                                <span>Plan My Perfect Trip</span>
+                                <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
+                            </button>
                         </div>
 
                         {/* Pricing & CTA */}
-                        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100 md:min-w-[160px]">
+                        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100 md:min-w-[180px]">
                             <div className="text-right">
                                 <div className="text-sm text-gray-500 line-through">
                                     {formatCurrency(currentPrice * 1.15)}
@@ -162,100 +148,41 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                                 </div>
                             </div>
 
+                            {/* Action Button */}
                             <button
-                                onClick={() => setIsExpanded(!isExpanded)}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all shadow-lg ${isExpanded
-                                    ? 'bg-gray-800 text-white shadow-gray-400/30 hover:bg-gray-700'
-                                    : 'bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white shadow-orange-500/30 hover:shadow-orange-500/40'
-                                    }`}
+                                onClick={() => setShowBookingModal(true)}
+                                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all shadow-lg bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white shadow-orange-500/30 hover:shadow-orange-500/40 hover:-translate-y-0.5"
                             >
-                                {isExpanded ? (
-                                    <>
-                                        <span>Close</span>
-                                        <ChevronUp className="w-4 h-4" />
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>SELECT CAR</span>
-                                        <ChevronDown className="w-4 h-4" />
-                                    </>
-                                )}
+                                <span>Select Car</span>
                             </button>
                         </div>
                     </div>
                 </div>
-
-                {/* Expandable Scout Interface */}
-                <AnimatePresence>
-                    {isExpanded && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                            className="overflow-hidden border-t border-gray-100"
-                        >
-                            <div className="p-4 bg-gradient-to-b from-gray-50 to-white">
-                                {/* Sarathi Header */}
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-[#2563EB] to-[#1E40AF] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                        <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-gray-800">Sarathi™</h3>
-                                        <p className="text-xs text-gray-500">
-                                            Smart trip planner • Customize your journey
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Scout Container */}
-                                <ScoutContainer
-                                    source={source}
-                                    destination={currentDestination}
-                                    car={car}
-                                    tripType={tripType}
-                                    onPriceUpdate={handlePriceUpdate}
-                                    pickupDate={pickupDate}
-                                    dropDate={dropDate}
-                                    pickupTime={pickupTime}
-                                    onDestinationChange={handleDestinationChange}
-                                    onTripStatsUpdate={handleTripStatsUpdate}
-                                />
-
-                                {/* Confirm Booking CTA */}
-                                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-xl border border-gray-100">
-                                    <div>
-                                        <div className="text-sm text-gray-500">Total Payable</div>
-                                        <div className="text-3xl font-bold text-gray-800">
-                                            {formatCurrency(currentPrice)}
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={handleConfirmBooking}
-                                        className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white rounded-xl font-bold shadow-xl shadow-blue-500/30 hover:shadow-blue-500/40 transition-all hover:-translate-y-0.5"
-                                    >
-                                        Confirm Booking
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </motion.div>
 
-            {/* Booking Modal */}
+            {/* Planning Modal */}
+            <PlanningModal
+                isOpen={showPlanningModal}
+                onClose={() => setShowPlanningModal(false)}
+                car={car}
+                source={source}
+                destination={destination}
+                tripType={tripType}
+                pickupDate={pickupDate}
+                dropDate={dropDate}
+                pickupTime={pickupTime}
+            />
+
+            {/* Direct Booking Modal (without customization) */}
             <BookingModal
                 isOpen={showBookingModal}
                 onClose={() => setShowBookingModal(false)}
                 source={source}
-                destination={currentDestination}
+                destination={destination}
                 car={car}
                 tripType={tripType}
                 tripStats={defaultTripStats}
-                selectedStops={currentStops}
+                selectedStops={[]}
                 pickupDate={pickupDate || new Date().toISOString().split('T')[0]}
                 dropDate={dropDate}
                 pickupTime={pickupTime || '09:00'}

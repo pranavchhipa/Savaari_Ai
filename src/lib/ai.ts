@@ -1,6 +1,7 @@
 'use server';
 
 import { AIRouteStopsResponse, AIRecommendation, StopBadge } from '@/types';
+import { getHotRouteData } from './hotRoutes';
 
 const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -32,6 +33,23 @@ export async function generateRouteStops(
         return cached.data;
     }
 
+    // 1. Check hot routes FIRST — instant, no AI credits
+    const hotRouteStops = getHotRouteData(source, destination);
+    if (hotRouteStops) {
+        console.log(`[Sarathi AI] Hot route match: ${source} → ${destination} (${hotRouteStops.length} stops, no AI call)`);
+        const hotResult: AIRouteStopsResponse = {
+            stops: hotRouteStops,
+            dontMiss: [...hotRouteStops]
+                .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                .slice(0, 3)
+                .map((s, i) => ({ ...s, id: `dont-miss-${i}`, badges: ['must-visit' as StopBadge, ...(s.badges || []).filter(b => b !== 'must-visit')] })),
+            nightHalt: distanceKm > 400 ? { city: 'Midpoint City', reason: 'Rest for a fresh start', approximateKm: Math.round(distanceKm * 0.45) } : undefined,
+        };
+        aiCache.set(cacheKey, { data: hotResult, timestamp: Date.now() });
+        return hotResult;
+    }
+
+    // 2. Check if AI API key is available
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
         console.warn('[Sarathi AI] No API key configured, using intelligent fallback');
@@ -40,47 +58,39 @@ export async function generateRouteStops(
 
     const needsNightHalt = distanceKm > 400;
 
-    const prompt = `You are Sarathi, Savaari's expert AI travel advisor for Indian road trips. You have deep knowledge of every tourist destination, cultural site, hidden gem, and legendary food stop across India.
+    const prompt = `You are Sarathi, Savaari's expert AI travel advisor for Indian road trips.
 
-For a road trip from "${source}" to "${destination}" (approximately ${Math.round(distanceKm)} km):
+Route: "${source}" → "${destination}" (~${Math.round(distanceKm)} km by road)
 
-Generate 8-10 MUST-VISIT tourist attractions and experiences that travelers would LOVE to discover along this specific route. Think like a passionate local guide who knows the BEST places.
+Generate 6-8 of the MOST FAMOUS tourist attractions that are ACTUALLY LOCATED ON or VERY NEAR (<20km detour) this specific driving route.
 
-RECOMMENDATION PRIORITIES (most important first):
-1. 🏛️ UNESCO Sites, National Monuments, Famous Temples, Historic Forts
-2. 🌊 Waterfalls, Lakes, National Parks, Scenic Natural Wonders  
-3. 📸 Instagram-worthy Viewpoints, Sunrise/Sunset spots
-4. 🎭 Cultural experiences, Traditional Markets, Artisan Villages
-5. 🍛 LEGENDARY food stops - famous dhabas, regional specialties that people drive hours for
-6. 🏔️ Adventure spots - trekking points, river crossings, eco-tourism
+BE SPECIFIC — use the actual highway/road this route follows. For example:
+- If the route passes through Agra → include Taj Mahal
+- If it passes through Jaipur → include Hawa Mahal, Amber Fort
+- If it passes near Lonavala → include it ONLY if the route actually goes via Mumbai-Pune Expressway
+- If it passes through Mahabaleshwar → include Mapro Garden, Arthur's Seat
 
-STRICT RULES:
-- ONLY include REAL, VERIFIABLE places with correct names
-- Places MUST be along or near this specific road route (within 30km detour max)
-- Sort by DISTANCE from source (approximateKm)
-- Each place must be genuinely worth stopping for - no generic rest stops
-- Focus on places that will make travelers say "I'm SO glad we stopped here!"
-- descriptions should be vivid, engaging travel writing (2 sentences max)
-- whyVisit should be a single compelling hook that makes someone pull over
+RULES (STRICTLY FOLLOW):
+✅ ONLY include: Famous temples, forts, monuments, UNESCO sites, waterfalls, national parks, iconic viewpoints, famous beaches, historic landmarks
+✅ Each place must be a REAL, NAMED, FAMOUS tourist attraction that any Indian would recognize
+✅ Places MUST physically lie on or within 20km of the actual driving route between these two cities
+✅ Sort by distance from source (approximateKm should be accurate road distance from source)
 
-For BADGES, assign based on real quality:
-- "must-visit": Famous enough that skipping would be a regret
-- "hidden-gem": Lesser-known but extraordinary
-- "instagram-worthy": Visually stunning, photo-worthy
-- "family-friendly": Great for kids and families
-- "off-the-beaten-path": Unique, adventurous, not touristy
+❌ DO NOT include: Hotels, resorts, petrol pumps, rest stops, generic restaurants, dhabas, highway food courts, malls, hospitals, gas stations, parking lots
+❌ DO NOT include places that are famous but NOT on this specific route
+❌ DO NOT make up fictional places — every name must be Google-searchable
 
 Respond in this EXACT JSON format (no markdown, only valid JSON):
 {
     "stops": [
         {
-            "name": "Exact Real Place Name",
-            "type": "heritage|tourist|nature|adventure|cultural|viewpoint|food",
-            "description": "Vivid 2-sentence description",
-            "whyVisit": "One compelling hook",
+            "name": "Exact Famous Place Name",
+            "type": "heritage|tourist|nature|adventure|cultural|viewpoint",
+            "description": "2-sentence vivid description",
+            "whyVisit": "One compelling reason",
             "famousFor": "What makes it iconic",
             "rating": 4.5,
-            "badges": ["must-visit", "instagram-worthy"],
+            "badges": ["must-visit"],
             "approximateKm": 85,
             "detourKm": 3,
             "suggestedDuration": 45,
@@ -96,7 +106,7 @@ Respond in this EXACT JSON format (no markdown, only valid JSON):
         {
             "name": "Top Pick Name",
             "type": "heritage",
-            "description": "This is THE reason to take this route",
+            "description": "The top reason to take this route",
             "whyVisit": "Unforgettable experience",
             "famousFor": "World-famous feature",
             "rating": 5,
@@ -119,16 +129,16 @@ Respond in this EXACT JSON format (no markdown, only valid JSON):
                 'X-Title': 'Savaari - Sarathi AI',
             },
             body: JSON.stringify({
-                model: 'openai/gpt-4o',
+                model: 'openai/gpt-4o-mini',
                 messages: [
                     {
                         role: 'system',
-                        content: 'You are Sarathi, an expert Indian travel planner. Respond ONLY with valid JSON, no markdown formatting.'
+                        content: 'You are Sarathi, an expert Indian travel planner who knows every road and famous landmark in India. Respond ONLY with valid JSON, no markdown formatting. Only recommend REAL, FAMOUS tourist attractions that are geographically ON the driving route.'
                     },
                     { role: 'user', content: prompt }
                 ],
-                temperature: 0.7,
-                max_tokens: 3000,
+                temperature: 0.4,
+                max_tokens: 2000,
             }),
         });
 
@@ -154,14 +164,20 @@ Respond in this EXACT JSON format (no markdown, only valid JSON):
 
         // Validate and enhance stops
         if (parsed.stops && Array.isArray(parsed.stops)) {
+            // Filter out non-tourist stops (hotels, petrol pumps, etc.)
+            const blockedKeywords = ['hotel', 'resort', 'petrol', 'pump', 'gas station', 'dhaba', 'restaurant', 'food court', 'mall', 'hospital', 'rest stop', 'parking'];
             parsed.stops = parsed.stops
-                .filter(stop => stop.name && stop.type && stop.approximateKm >= 0)
+                .filter(stop => {
+                    if (!stop.name || !stop.type || stop.approximateKm < 0) return false;
+                    const nameLower = stop.name.toLowerCase();
+                    return !blockedKeywords.some(kw => nameLower.includes(kw));
+                })
                 .map((stop, index) => ({
                     ...stop,
                     id: `ai-stop-${index}`,
                     rating: Math.min(5, Math.max(1, stop.rating || 4)),
                     badges: validateBadges(stop.badges),
-                    detourKm: Math.min(30, stop.detourKm || 5),
+                    detourKm: Math.min(20, stop.detourKm || 5),
                     suggestedDuration: stop.suggestedDuration || 30,
                     type: validateStopType(stop.type),
                 }));
@@ -221,7 +237,7 @@ function generateIntelligentFallback(
     const srcLower = source.toLowerCase();
     const destLower = destination.toLowerCase();
 
-    // Popular route database — curated by product team
+    // Popular route database — curated with REAL famous tourist attractions
     const popularRoutes: Record<string, AIRecommendation[]> = {
         'bangalore-mysore': [
             {
@@ -237,22 +253,22 @@ function generateIntelligentFallback(
                 rating: 4.0, badges: ['hidden-gem', 'family-friendly'], approximateKm: 65, detourKm: 1, suggestedDuration: 40, bestTimeToVisit: 'anytime',
             },
             {
-                id: 'fb-3', name: 'Srirangapatna', type: 'heritage',
+                id: 'fb-3', name: 'Srirangapatna Fort', type: 'heritage',
                 description: 'The island fortress where Tipu Sultan made his last stand. Explore the summer palace, dungeons, and the sacred Ranganathaswamy Temple.',
                 whyVisit: 'Walk through a fortress that changed Indian history', famousFor: 'Tipu Sultan Fort & Ranganathaswamy Temple',
                 rating: 4.7, badges: ['must-visit', 'family-friendly'], approximateKm: 120, detourKm: 3, suggestedDuration: 60, bestTimeToVisit: 'morning',
             },
             {
-                id: 'fb-4', name: 'Kamat Lokaruchi', type: 'food',
-                description: 'Legendary highway restaurant serving authentic Karnataka thali for over 50 years. The filter coffee here is the stuff of road-trip legends.',
-                whyVisit: 'The most famous pit stop on the Bangalore-Mysore highway', famousFor: 'Karnataka thali & filter coffee',
-                rating: 4.3, badges: ['must-visit'], approximateKm: 80, detourKm: 0, suggestedDuration: 45, bestTimeToVisit: 'anytime',
-            },
-            {
-                id: 'fb-5', name: 'Brindavan Gardens', type: 'tourist',
+                id: 'fb-4', name: 'Brindavan Gardens', type: 'tourist',
                 description: 'The iconic illuminated musical fountain gardens at KRS Dam. A mesmerizing spectacle of water, light, and music after sunset.',
                 whyVisit: 'One of India\'s most famous garden experiences', famousFor: 'Musical fountain & illuminated gardens',
                 rating: 4.5, badges: ['must-visit', 'instagram-worthy', 'family-friendly'], approximateKm: 140, detourKm: 5, suggestedDuration: 90, bestTimeToVisit: 'evening',
+            },
+            {
+                id: 'fb-5', name: 'Mysore Palace', type: 'heritage',
+                description: 'One of India\'s most magnificent royal palaces. The illuminated palace at night with 97,000 bulbs is an unforgettable sight.',
+                whyVisit: 'India\'s most visited palace after the Taj Mahal', famousFor: 'Indo-Saracenic architecture & illumination',
+                rating: 4.9, badges: ['must-visit', 'instagram-worthy'], approximateKm: 150, detourKm: 0, suggestedDuration: 90, bestTimeToVisit: 'morning',
             },
         ],
         'bangalore-goa': [
@@ -263,40 +279,153 @@ function generateIntelligentFallback(
                 rating: 4.6, badges: ['must-visit', 'instagram-worthy'], approximateKm: 200, detourKm: 5, suggestedDuration: 90, bestTimeToVisit: 'morning',
             },
             {
-                id: 'fb-2', name: 'Hampi Ruins', type: 'heritage',
-                description: 'UNESCO World Heritage Site - the spectacular ruins of the Vijayanagara Empire. Boulder-strewn landscape with ancient temples beyond imagination.',
-                whyVisit: 'A UNESCO wonder that will leave you speechless', famousFor: 'Vijayanagara ruins & boulder landscape',
-                rating: 5.0, badges: ['must-visit', 'instagram-worthy'], approximateKm: 350, detourKm: 30, suggestedDuration: 180, bestTimeToVisit: 'morning',
-            },
-            {
-                id: 'fb-3', name: 'Jog Falls', type: 'nature',
+                id: 'fb-2', name: 'Jog Falls', type: 'nature',
                 description: 'India\'s second-highest plunge waterfall, thundering 253 meters down. During monsoon, the mist can be seen from kilometers away.',
                 whyVisit: 'Witness India\'s most powerful waterfall', famousFor: 'Second-highest plunge waterfall in India',
                 rating: 4.8, badges: ['must-visit', 'instagram-worthy'], approximateKm: 380, detourKm: 25, suggestedDuration: 120, bestTimeToVisit: 'morning',
             },
             {
-                id: 'fb-4', name: 'Dandeli Wildlife Sanctuary', type: 'adventure',
+                id: 'fb-3', name: 'Dandeli Wildlife Sanctuary', type: 'adventure',
                 description: 'White-water rafting in the Kali River and spotting hornbills in pristine Western Ghats forest. The adventure capital of Karnataka.',
                 whyVisit: 'Rafting, jungle safari & birdwatching in one stop', famousFor: 'White-water rafting & hornbill spotting',
                 rating: 4.5, badges: ['off-the-beaten-path', 'instagram-worthy'], approximateKm: 450, detourKm: 15, suggestedDuration: 120, bestTimeToVisit: 'morning',
             },
             {
-                id: 'fb-5', name: 'Dudhsagar Falls', type: 'nature',
-                description: 'The "Sea of Milk" - a breathtaking 310m waterfall straddling the Goa-Karnataka border. Accessible via an unforgettable jeep safari through the forest.',
+                id: 'fb-4', name: 'Dudhsagar Falls', type: 'nature',
+                description: 'The "Sea of Milk" - a breathtaking 310m waterfall straddling the Goa-Karnataka border. Accessible via an unforgettable jeep safari.',
                 whyVisit: 'India\'s most photogenic waterfall', famousFor: '310m waterfall & jeep safari',
                 rating: 4.9, badges: ['must-visit', 'instagram-worthy'], approximateKm: 530, detourKm: 20, suggestedDuration: 150, bestTimeToVisit: 'morning',
             },
         ],
+        'mumbai-goa': [
+            {
+                id: 'fb-1', name: 'Imagica Theme Park', type: 'tourist',
+                description: 'India\'s leading international-standard theme park with thrilling rides and immersive experiences. A must-stop for families on the Mumbai-Goa highway.',
+                whyVisit: 'India\'s best theme park experience', famousFor: 'Roller coasters & entertainment',
+                rating: 4.3, badges: ['family-friendly'], approximateKm: 90, detourKm: 3, suggestedDuration: 120, bestTimeToVisit: 'anytime',
+            },
+            {
+                id: 'fb-2', name: 'Pratapgad Fort', type: 'heritage',
+                description: 'The mountain fortress where Shivaji Maharaj defeated Afzal Khan. Offers panoramic views of the Sahyadri ranges and Western Ghats.',
+                whyVisit: 'Walk the battleground of Maratha history', famousFor: 'Shivaji\'s victory over Afzal Khan',
+                rating: 4.6, badges: ['must-visit', 'instagram-worthy'], approximateKm: 200, detourKm: 15, suggestedDuration: 90, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-3', name: 'Ratnagiri', type: 'heritage',
+                description: 'The coastal gem known for the finest Alphonso mangoes and the Thibaw Palace where the last King of Burma was exiled. Stunning sea forts dot the coastline.',
+                whyVisit: 'Taste the world\'s best mangoes at their source', famousFor: 'Alphonso mangoes & Thibaw Palace',
+                rating: 4.4, badges: ['hidden-gem'], approximateKm: 320, detourKm: 10, suggestedDuration: 60, bestTimeToVisit: 'anytime',
+            },
+            {
+                id: 'fb-4', name: 'Sindhudurg Fort', type: 'heritage',
+                description: 'Shivaji Maharaj\'s masterpiece sea fort built on a rocky island. The engineering marvel stands surrounded by Arabian Sea waters.',
+                whyVisit: 'A spectacular sea fortress built by Shivaji himself', famousFor: 'Island sea fort & Maratha naval power',
+                rating: 4.7, badges: ['must-visit', 'instagram-worthy'], approximateKm: 400, detourKm: 12, suggestedDuration: 90, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-5', name: 'Tarkarli Beach', type: 'nature',
+                description: 'Crystal-clear waters perfect for snorkeling and scuba diving. One of India\'s most pristine and underrated beach destinations.',
+                whyVisit: 'India\'s clearest waters for snorkeling', famousFor: 'Scuba diving & crystal-clear sea',
+                rating: 4.5, badges: ['hidden-gem', 'instagram-worthy'], approximateKm: 420, detourKm: 15, suggestedDuration: 120, bestTimeToVisit: 'morning',
+            },
+        ],
+        'delhi-agra': [
+            {
+                id: 'fb-1', name: 'ISKCON Temple Vrindavan', type: 'heritage',
+                description: 'The magnificent Krishna temple complex in the holy city of Vrindavan. One of the most beautiful modern temples in India.',
+                whyVisit: 'A spiritual masterpiece in Lord Krishna\'s birthplace', famousFor: 'Krishna worship & architectural beauty',
+                rating: 4.6, badges: ['must-visit', 'family-friendly'], approximateKm: 130, detourKm: 10, suggestedDuration: 60, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-2', name: 'Mathura Birthplace Temple', type: 'heritage',
+                description: 'The sacred birthplace of Lord Krishna, one of Hinduism\'s holiest sites. The temple complex buzzes with devotional energy and ancient history.',
+                whyVisit: 'Stand at the exact spot where Lord Krishna was born', famousFor: 'Krishna Janmabhoomi',
+                rating: 4.8, badges: ['must-visit'], approximateKm: 145, detourKm: 5, suggestedDuration: 60, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-3', name: 'Taj Mahal', type: 'heritage',
+                description: 'The crown jewel of India — a UNESCO World Heritage Site and one of the Seven Wonders of the World. Shah Jahan\'s eternal monument to love.',
+                whyVisit: 'The most iconic monument on Earth', famousFor: 'Symbol of eternal love & Mughal architecture',
+                rating: 5.0, badges: ['must-visit', 'instagram-worthy'], approximateKm: 200, detourKm: 0, suggestedDuration: 120, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-4', name: 'Agra Fort', type: 'heritage',
+                description: 'The massive red sandstone fortress of the Mughal emperors. Shah Jahan spent his last days here, gazing at the Taj Mahal he built.',
+                whyVisit: 'Where Shah Jahan was imprisoned with a view of the Taj', famousFor: 'Mughal imperial fortress',
+                rating: 4.7, badges: ['must-visit', 'instagram-worthy'], approximateKm: 202, detourKm: 0, suggestedDuration: 90, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-5', name: 'Fatehpur Sikri', type: 'heritage',
+                description: 'Akbar\'s magnificent abandoned capital city — a UNESCO World Heritage Site. The Buland Darwaza is the tallest gateway in the world.',
+                whyVisit: 'A perfectly preserved ghost city of the Mughal Empire', famousFor: 'Buland Darwaza & Panch Mahal',
+                rating: 4.6, badges: ['must-visit', 'instagram-worthy'], approximateKm: 235, detourKm: 2, suggestedDuration: 90, bestTimeToVisit: 'morning',
+            },
+        ],
+        'delhi-jaipur': [
+            {
+                id: 'fb-1', name: 'Neemrana Fort Palace', type: 'heritage',
+                description: 'A 15th-century hilltop fort converted into a stunning heritage hotel. The zip-lining across the fort walls offers breathtaking views.',
+                whyVisit: 'Zip-line across a 600-year-old fortress', famousFor: 'Heritage fort & zip-lining',
+                rating: 4.5, badges: ['instagram-worthy', 'must-visit'], approximateKm: 120, detourKm: 2, suggestedDuration: 60, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-2', name: 'Amber Fort', type: 'heritage',
+                description: 'The majestic hilltop fortress overlooking Maota Lake. The Sheesh Mahal (Mirror Palace) inside creates a magical starlit effect.',
+                whyVisit: 'Rajasthan\'s most stunning hilltop fortress', famousFor: 'Sheesh Mahal & elephant rides',
+                rating: 4.9, badges: ['must-visit', 'instagram-worthy'], approximateKm: 260, detourKm: 5, suggestedDuration: 120, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-3', name: 'Hawa Mahal', type: 'heritage',
+                description: 'The iconic "Palace of Winds" with 953 small windows. Jaipur\'s most recognizable landmark, glowing pink at sunrise.',
+                whyVisit: 'India\'s most photographed palace facade', famousFor: '953 windows & pink sandstone architecture',
+                rating: 4.8, badges: ['must-visit', 'instagram-worthy'], approximateKm: 270, detourKm: 0, suggestedDuration: 45, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-4', name: 'City Palace Jaipur', type: 'heritage',
+                description: 'The royal residence of the Jaipur Maharaja, blending Rajasthani and Mughal architecture. Home to the world\'s largest silver vessels.',
+                whyVisit: 'See how Indian royalty lived', famousFor: 'Royal architecture & world\'s largest silver vessels',
+                rating: 4.7, badges: ['must-visit', 'family-friendly'], approximateKm: 272, detourKm: 0, suggestedDuration: 90, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-5', name: 'Jantar Mantar Jaipur', type: 'heritage',
+                description: 'UNESCO World Heritage astronomical observatory built by Maharaja Jai Singh II. Houses the world\'s largest stone sundial.',
+                whyVisit: 'Ancient astronomical genius in stone', famousFor: 'World\'s largest stone sundial & UNESCO site',
+                rating: 4.4, badges: ['must-visit'], approximateKm: 273, detourKm: 0, suggestedDuration: 45, bestTimeToVisit: 'anytime',
+            },
+        ],
     };
 
-    // Try to find a matching route
-    const routeKey = `${srcLower}-${destLower}`;
-    const reverseKey = `${destLower}-${srcLower}`;
+    // Try to find a matching route (normalize city names)
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
+    const srcNorm = normalize(source);
+    const destNorm = normalize(destination);
+    const routeKey = `${srcNorm}-${destNorm}`;
+    const reverseKey = `${destNorm}-${srcNorm}`;
+
+    // Also try partial matches (e.g. "new delhi" matches "delhi")
     let stops = popularRoutes[routeKey] || popularRoutes[reverseKey];
+    if (!stops) {
+        for (const key of Object.keys(popularRoutes)) {
+            const [k1, k2] = key.split('-');
+            if ((srcNorm.includes(k1) || k1.includes(srcNorm)) && (destNorm.includes(k2) || k2.includes(destNorm))) {
+                stops = popularRoutes[key];
+                break;
+            }
+            if ((srcNorm.includes(k2) || k2.includes(srcNorm)) && (destNorm.includes(k1) || k1.includes(destNorm))) {
+                stops = popularRoutes[key];
+                break;
+            }
+        }
+    }
 
     if (!stops) {
-        // Generate generic but engaging stops based on distance
-        stops = generateGenericTouristStops(source, destination, distanceKm);
+        // No fallback data — return empty so the UI shows "no recommendations"
+        // instead of fake placeholder stops
+        return {
+            stops: [],
+            dontMiss: [],
+            fallback: true,
+        };
     }
 
     const needsNightHalt = distanceKm > 400;
@@ -314,35 +443,6 @@ function generateIntelligentFallback(
             .map((s, i) => ({ ...s, id: `dont-miss-${i}`, badges: ['must-visit' as StopBadge, ...(s.badges || []).filter(b => b !== 'must-visit')] })),
         fallback: true,
     };
-}
-
-function generateGenericTouristStops(source: string, destination: string, distanceKm: number): AIRecommendation[] {
-    const stopCount = Math.min(8, Math.max(4, Math.floor(distanceKm / 80)));
-    const stops: AIRecommendation[] = [];
-    const types: AIRecommendation['type'][] = ['heritage', 'viewpoint', 'food', 'nature', 'cultural', 'tourist'];
-
-    for (let i = 0; i < stopCount; i++) {
-        const progress = (i + 1) / (stopCount + 1);
-        const km = Math.round(distanceKm * progress);
-        const type = types[i % types.length];
-
-        stops.push({
-            id: `gen-${i}`,
-            name: `Scenic Stop ${i + 1}`,
-            type,
-            description: `A beautiful ${type} stop along the ${source} to ${destination} route. Worth a quick visit to stretch your legs and soak in the surroundings.`,
-            whyVisit: `Experience the beauty of the ${source}-${destination} corridor`,
-            famousFor: `Local ${type} attraction`,
-            rating: 3.5 + Math.random(),
-            badges: i === 0 ? ['must-visit'] : i === stopCount - 1 ? ['hidden-gem'] : [],
-            approximateKm: km,
-            detourKm: Math.round(Math.random() * 10 + 2),
-            suggestedDuration: 30 + Math.round(Math.random() * 30),
-            bestTimeToVisit: 'anytime',
-        });
-    }
-
-    return stops;
 }
 
 /**

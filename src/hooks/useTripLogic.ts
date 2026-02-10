@@ -8,6 +8,15 @@ import { getCoordinateAtDistance, calculateArrivalTime, getMidpointForNightHalt 
 import { isPointInBoundingBox, getRouteMetrics } from '@/lib/geoUtils';
 import { loadGoogleMapsScript } from '@/lib/maps';
 
+// Module-level client-side cache for AI responses
+// Persists across component mounts → switching cars doesn't re-fetch
+const clientAICache = new Map<string, { data: AIRouteStopsResponse; timestamp: number }>();
+const CLIENT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getClientCacheKey(source: string, dest: string): string {
+    return `${source.toLowerCase().trim()}-${dest.toLowerCase().trim()}`;
+}
+
 interface UseTripLogicProps {
     source: Location | null;
     destination: Location | null;
@@ -158,12 +167,27 @@ export function useTripLogic({
         return result;
     }, []);
 
-    // Fetch AI-generated stops
+    // Fetch AI-generated stops (with client-side cache)
     const fetchAIStops = async (
         sourceName: string,
         destName: string,
         distanceKm: number
     ): Promise<AIRouteStopsResponse | null> => {
+        // Check client-side cache first
+        const cacheKey = getClientCacheKey(sourceName, destName);
+        const cached = clientAICache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CLIENT_CACHE_TTL) {
+            console.log(`[Sarathi] Client cache hit for ${sourceName} → ${destName}`);
+            return cached.data;
+        }
+        // Also check reverse direction
+        const reverseCacheKey = getClientCacheKey(destName, sourceName);
+        const reverseCached = clientAICache.get(reverseCacheKey);
+        if (reverseCached && Date.now() - reverseCached.timestamp < CLIENT_CACHE_TTL) {
+            console.log(`[Sarathi] Client cache hit (reverse) for ${sourceName} → ${destName}`);
+            return reverseCached.data;
+        }
+
         try {
             const response = await fetch('/api/ai/generate-stops', {
                 method: 'POST',
@@ -176,7 +200,12 @@ export function useTripLogic({
             });
 
             if (!response.ok) return null;
-            return await response.json();
+            const data = await response.json();
+
+            // Cache the response
+            clientAICache.set(cacheKey, { data, timestamp: Date.now() });
+            console.log(`[Sarathi] Cached AI response for ${sourceName} → ${destName}`);
+            return data;
         } catch (error) {
             console.error('Failed to fetch AI stops:', error);
             return null;
@@ -189,7 +218,7 @@ export function useTripLogic({
         biasLat: number,
         biasLng: number,
         radiusMeters: number = 50000
-    ): Promise<Location[]> => {
+    ): Promise<(Location & { photoUrl?: string })[]> => {
         if (typeof window === 'undefined' || !window.google?.maps?.places) {
             console.warn('Google Maps API not loaded yet');
             return [];
@@ -205,12 +234,23 @@ export function useTripLogic({
 
             service.textSearch(request, (results, status) => {
                 if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-                    const mapped = results.map(p => ({
-                        name: p.name || '',
-                        displayName: p.formatted_address || p.name || '',
-                        lat: p.geometry?.location?.lat() || 0,
-                        lng: p.geometry?.location?.lng() || 0,
-                    }));
+                    const mapped = results.map(p => {
+                        // Capture first photo URL if available
+                        let photoUrl: string | undefined;
+                        try {
+                            if (p.photos && p.photos.length > 0) {
+                                photoUrl = p.photos[0].getUrl({ maxWidth: 800, maxHeight: 600 });
+                            }
+                        } catch { /* ignore photo errors */ }
+
+                        return {
+                            name: p.name || '',
+                            displayName: p.formatted_address || p.name || '',
+                            lat: p.geometry?.location?.lat() || 0,
+                            lng: p.geometry?.location?.lng() || 0,
+                            photoUrl,
+                        };
+                    });
                     resolve(mapped);
                 } else {
                     resolve([]);
@@ -239,7 +279,7 @@ export function useTripLogic({
         });
     };
 
-    // Validate and process AI stops against route using Google Places
+    // Validate and process AI stops against route using Google Places (PARALLEL)
     const processAndValidateStops = async (
         aiStops: AIRecommendation[],
         leg: 'onward' | 'return',
@@ -247,23 +287,23 @@ export function useTripLogic({
         legDest: Location,
         routeCoordinates: RouteData['coordinates']
     ): Promise<AIRecommendation[]> => {
-        const validatedStops: (AIRecommendation & { routeIndex: number })[] = [];
-
         // Calculate route midpoint for location bias
         const midLat = (legSource.lat + legDest.lat) / 2;
         const midLng = (legSource.lng + legDest.lng) / 2;
 
-        for (const stop of aiStops) {
-            try {
+        // Validate ALL stops in parallel for speed
+        const results = await Promise.allSettled(
+            aiStops.map(async (stop) => {
                 // Try Google Places (Client SDK) first
                 let locations = await searchPlaceWithGoogle(stop.name, midLat, midLng);
 
-                // Fallback to Geocoding Service (Client SDK) if Google Places returns nothing
+                // Fallback to Geocoding Service (Client SDK)
                 if (locations.length === 0) {
-                    locations = await searchPlaceWithGeocoder(stop.name);
+                    const geoResults = await searchPlaceWithGeocoder(stop.name);
+                    locations = geoResults.map(l => ({ ...l, photoUrl: undefined }));
                 }
 
-                let bestMatch: { location: Location; metrics: { minDistance: number; routeIndex: number } } | null = null;
+                let bestMatch: { location: Location & { photoUrl?: string }; metrics: { minDistance: number; routeIndex: number } } | null = null;
 
                 for (const loc of locations) {
                     if (isPointInBoundingBox(loc, legSource, legDest, 100)) {
@@ -277,17 +317,17 @@ export function useTripLogic({
                 }
 
                 if (bestMatch) {
-                    validatedStops.push({
-                        ...stop,
-                        routeIndex: bestMatch.metrics.routeIndex
-                    });
-                } else {
-                    console.warn(`[Sarathi] Rejected stop: ${stop.name} - Not found near route`);
+                    return { ...stop, routeIndex: bestMatch.metrics.routeIndex, photoUrl: bestMatch.location.photoUrl };
                 }
-            } catch (e) {
-                console.warn(`[Sarathi] Geocoding failed for ${stop.name}`);
-            }
-        }
+                console.warn(`[Sarathi] Rejected stop: ${stop.name} - Not found near route`);
+                return null;
+            })
+        );
+
+        const validatedStops = results
+            .filter(r => r.status === 'fulfilled')
+            .map(r => (r as PromiseFulfilledResult<(AIRecommendation & { routeIndex: number; photoUrl?: string }) | null>).value)
+            .filter((v): v is AIRecommendation & { routeIndex: number } => v !== null);
 
         // Sort by route index
         if (leg === 'onward') {
@@ -382,6 +422,25 @@ export function useTripLogic({
                         'onward'
                     );
                     finalStops = [...finalStops, ...mappedOnward];
+                }
+
+                // Update recommendations with photos from validation
+                if (validatedOnward.length > 0) {
+                    setRecommendations(prev => {
+                        const validatedMap = new Map(validatedOnward.map((v) => [v.name, v]));
+                        return prev.map(p => {
+                            const validated = validatedMap.get(p.name);
+                            return validated && validated.photoUrl ? { ...p, photoUrl: validated.photoUrl } : p;
+                        });
+                    });
+
+                    setDontMiss(prev => {
+                        const validatedMap = new Map(validatedOnward.map((v) => [v.name, v]));
+                        return prev.map(p => {
+                            const validated = validatedMap.get(p.name);
+                            return validated && validated.photoUrl ? { ...p, photoUrl: validated.photoUrl } : p;
+                        });
+                    });
                 }
             } else {
                 // Minimal start/end if AI completely fails

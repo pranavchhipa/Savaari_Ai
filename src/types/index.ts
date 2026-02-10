@@ -171,6 +171,7 @@ export interface AIRecommendation {
   suggestedDuration: number;
   bestTimeToVisit?: string;
   imageQuery?: string;
+  photoUrl?: string;       // Google Places photo URL
 }
 
 export interface AIRouteStopsResponse {

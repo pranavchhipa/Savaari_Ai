@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { APIProvider, Map, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { Stop, RoutePoint, RouteOption } from '@/types';
-import { getStopTypeColor, getStopTypeIcon } from '@/lib/calculateTripStats';
+import { Stop, RoutePoint, RouteOption, TripStats } from '@/types';
+import { getStopTypeColor, getStopTypeIcon, formatCurrency, formatDistance } from '@/lib/calculateTripStats';
 
 interface GoogleMapProps {
     routeCoordinates: RoutePoint[];
@@ -14,6 +14,8 @@ interface GoogleMapProps {
     selectedStopId?: string;
     onStopClick?: (stopId: string) => void;
     tripType: 'one-way' | 'round-trip';
+    tripStats?: TripStats;
+    perKmRate?: number;
 }
 
 // Stop marker with category-specific styling
@@ -128,6 +130,100 @@ function StopMarker({
     return null;
 }
 
+// Route statistics marker (Price/Distance label)
+function RouteStatsMarker({
+    coordinates,
+    tripStats,
+    perKmRate,
+}: {
+    coordinates: RoutePoint[];
+    tripStats: TripStats;
+    perKmRate: number;
+}) {
+    const map = useMap();
+    const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+    const markerLib = useMapsLibrary('marker');
+
+    useEffect(() => {
+        if (!map || !markerLib || coordinates.length === 0) return;
+
+        // Find midpoint of the route
+        const midIndex = Math.floor(coordinates.length / 2);
+        const midPoint = coordinates[midIndex];
+
+        // Remove old marker
+        if (markerRef.current) {
+            markerRef.current.map = null;
+        }
+
+        // Create marker content
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'route-stats-label';
+        contentDiv.innerHTML = `
+            <div style="
+                background: white;
+                padding: 6px 12px;
+                border-radius: 20px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                border: 1.5px solid #2563EB;
+                font-family: system-ui, -apple-system, sans-serif;
+                white-space: nowrap;
+                transform: translateY(-50%);
+            ">
+                <span style="
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #1E293B;
+                ">${formatDistance(tripStats.totalDistanceKm)}</span>
+                <span style="
+                    width: 4px;
+                    height: 4px;
+                    background: #CBD5E1;
+                    border-radius: 50%;
+                "></span>
+                <span style="
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #64748B;
+                ">${formatCurrency(perKmRate)}/km</span>
+                ${tripStats.tollEstimate > 0 ? `
+                    <span style="
+                        width: 4px;
+                        height: 4px;
+                        background: #CBD5E1;
+                        border-radius: 50%;
+                    "></span>
+                    <span style="
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: #EA580C;
+                    ">Toll: ${formatCurrency(tripStats.tollEstimate)}</span>
+                ` : ''}
+            </div>
+        `;
+
+        const marker = new markerLib.AdvancedMarkerElement({
+            position: { lat: midPoint.lat, lng: midPoint.lng },
+            map,
+            content: contentDiv,
+            zIndex: 1000,
+        });
+
+        markerRef.current = marker;
+
+        return () => {
+            if (markerRef.current) {
+                markerRef.current.map = null;
+            }
+        };
+    }, [map, markerLib, coordinates, tripStats, perKmRate]);
+
+    return null;
+}
+
 // Route polyline component
 function RoutePolyline({
     coordinates,
@@ -210,6 +306,8 @@ function MapContent({
     selectedStopId,
     onStopClick,
     tripType,
+    tripStats,
+    perKmRate,
 }: GoogleMapProps) {
     const map = useMap();
 
@@ -244,8 +342,8 @@ function MapContent({
                         key={route.id}
                         coordinates={route.coordinates}
                         color={route.color || '#94A3B8'}
-                        weight={5}
-                        opacity={0.8}
+                        weight={6}
+                        opacity={0.6}
                         isSelected={false}
                         onClick={() => onRouteSelect?.(route.id)}
                         zIndex={1}
@@ -253,7 +351,6 @@ function MapContent({
                 );
             })}
 
-            {/* Selected route (primary, bright) */}
             <RoutePolyline
                 coordinates={routeCoordinates}
                 color="#2563EB"
@@ -262,6 +359,15 @@ function MapContent({
                 isSelected={true}
                 zIndex={10}
             />
+
+            {/* Price/Stats Label on Route */}
+            {tripStats && perKmRate && (
+                <RouteStatsMarker
+                    coordinates={routeCoordinates}
+                    tripStats={tripStats}
+                    perKmRate={perKmRate}
+                />
+            )}
 
             {/* Stop markers */}
             {stops.map((stop, index) => (

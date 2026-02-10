@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Location, Car, Stop, JourneySegment, TripStats } from '@/types';
 import { useTripLogic } from '@/hooks/useTripLogic';
 import Timeline from './Timeline';
@@ -36,6 +36,7 @@ interface ScoutContainerProps {
     pickupTime?: string;
     onDestinationChange?: (newDestination: Location) => void;
     onTripStatsUpdate?: (tripStats: TripStats, selectedStops: Stop[]) => void;
+    isInModal?: boolean;
 }
 
 export default function ScoutContainer({
@@ -49,6 +50,7 @@ export default function ScoutContainer({
     pickupTime,
     onDestinationChange,
     onTripStatsUpdate,
+    isInModal = false,
 }: ScoutContainerProps) {
     const [focusedStopId, setFocusedStopId] = useState<string | undefined>();
     const [showDestinationChanger, setShowDestinationChanger] = useState(false);
@@ -188,7 +190,8 @@ export default function ScoutContainer({
             const dayStops = onwardStops.slice(startIdx, endIdx);
             const daySegments = journeySegments.filter(js => dayStops.includes(js.fromStop));
 
-            const date = new Date(pickupDate);
+            const parsedDate = new Date(pickupDate);
+            const date = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
             date.setDate(date.getDate() + day);
 
             const dayDistance = daySegments.reduce((sum, s) => sum + s.distanceKm, 0);
@@ -216,7 +219,8 @@ export default function ScoutContainer({
                 const daySegments = journeySegments.filter(js => dayStops.includes(js.fromStop));
 
                 const dayOffset = (totalTripDays === 1 ? 0 : onwardDaysCount + i);
-                const date = new Date(pickupDate);
+                const returnParsedDate = new Date(pickupDate);
+                const date = isNaN(returnParsedDate.getTime()) ? new Date() : returnParsedDate;
                 date.setDate(date.getDate() + dayOffset);
 
                 const dayDistance = daySegments.reduce((sum, s) => sum + s.distanceKm, 0);
@@ -280,7 +284,10 @@ export default function ScoutContainer({
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-gradient-to-br from-gray-50 to-white rounded-2xl border border-gray-200 overflow-hidden"
+            className={isInModal
+                ? 'bg-white overflow-hidden'
+                : 'bg-gradient-to-br from-gray-50 to-white rounded-2xl border border-gray-200 overflow-hidden'
+            }
         >
             {/* Premium Journey Header */}
             <div className="p-4">
@@ -440,173 +447,189 @@ export default function ScoutContainer({
             <div className="flex flex-col lg:flex-row min-h-[500px]">
                 {/* Journey Content */}
                 <div className="order-2 lg:order-1 w-full lg:w-2/5 p-4 lg:border-r border-gray-100 overflow-y-auto max-h-[600px]">
-                    {viewMode === 'daywise' ? (
-                        <div className="space-y-4">
-                            {tripType === 'round-trip' && journeyDays.length > 0 && (
-                                <>
-                                    {/* Onward Journey Header */}
-                                    <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl text-white">
-                                        <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M5 12h14M12 5l7 7-7 7" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-sm">Onward Journey</div>
-                                            <div className="text-xs text-blue-100">
-                                                {source.name} → {currentDestination.name}
+                    <AnimatePresence mode="wait">
+                        {viewMode === 'daywise' ? (
+                            <motion.div
+                                key="daywise"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-4"
+                            >
+                                {tripType === 'round-trip' && journeyDays.length > 0 && (
+                                    <>
+                                        {/* Onward Journey Header */}
+                                        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl text-white">
+                                            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M5 12h14M12 5l7 7-7 7" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm">Onward Journey</div>
+                                                <div className="text-xs text-blue-100">
+                                                    {source.name} → {currentDestination.name}
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto text-right">
+                                                <div className="text-xs text-blue-100">Distance</div>
+                                                <div className="font-bold text-sm">{formatDistance(tripStats.totalDistanceKm / 2)}</div>
                                             </div>
                                         </div>
-                                        <div className="ml-auto text-right">
-                                            <div className="text-xs text-blue-100">Distance</div>
-                                            <div className="font-bold text-sm">{formatDistance(tripStats.totalDistanceKm / 2)}</div>
-                                        </div>
-                                    </div>
 
-                                    {journeyDays.slice(0, Math.ceil(journeyDays.length / 2)).map((day, idx) => (
-                                        <JourneyDayCard
-                                            key={`onward-${day.dayNumber}`}
-                                            dayNumber={day.dayNumber}
-                                            date={day.date}
-                                            stops={day.stops}
-                                            segments={day.segments}
-                                            selectedStops={selectedStops}
-                                            onToggleStop={toggleStopSelection}
-                                            onFocusStop={setFocusedStopId}
-                                            totalDriveTimeMinutes={day.totalDriveTimeMinutes}
-                                            totalDistanceKm={day.totalDistanceKm}
-                                            nightHalt={day.nightHalt}
-                                            isFirstDay={idx === 0}
-                                            isLastDay={false}
-                                        />
-                                    ))}
+                                        {journeyDays.slice(0, Math.ceil(journeyDays.length / 2)).map((day, idx) => (
+                                            <JourneyDayCard
+                                                key={`onward-${day.dayNumber}`}
+                                                dayNumber={day.dayNumber}
+                                                date={day.date}
+                                                stops={day.stops}
+                                                segments={day.segments}
+                                                selectedStops={selectedStops}
+                                                onToggleStop={toggleStopSelection}
+                                                onFocusStop={setFocusedStopId}
+                                                totalDriveTimeMinutes={day.totalDriveTimeMinutes}
+                                                totalDistanceKm={day.totalDistanceKm}
+                                                nightHalt={day.nightHalt}
+                                                isFirstDay={idx === 0}
+                                                isLastDay={false}
+                                            />
+                                        ))}
 
-                                    {/* Return Journey Header */}
-                                    <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl text-white mt-6">
-                                        <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M19 12H5M12 19l-7-7 7-7" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-sm">Return Journey</div>
-                                            <div className="text-xs text-orange-100">
-                                                {currentDestination.name} → {source.name}
+                                        {/* Return Journey Header */}
+                                        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl text-white mt-6">
+                                            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm">Return Journey</div>
+                                                <div className="text-xs text-orange-100">
+                                                    {currentDestination.name} → {source.name}
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto text-right">
+                                                <div className="text-xs text-orange-100">Distance</div>
+                                                <div className="font-bold text-sm">{formatDistance(tripStats.totalDistanceKm / 2)}</div>
                                             </div>
                                         </div>
-                                        <div className="ml-auto text-right">
-                                            <div className="text-xs text-orange-100">Distance</div>
-                                            <div className="font-bold text-sm">{formatDistance(tripStats.totalDistanceKm / 2)}</div>
-                                        </div>
-                                    </div>
 
-                                    {journeyDays.slice(Math.ceil(journeyDays.length / 2)).map((day, idx, arr) => (
-                                        <JourneyDayCard
-                                            key={`return-${day.dayNumber}`}
-                                            dayNumber={day.dayNumber}
-                                            date={day.date}
-                                            stops={day.stops}
-                                            segments={day.segments}
-                                            selectedStops={selectedStops}
-                                            onToggleStop={toggleStopSelection}
-                                            onFocusStop={setFocusedStopId}
-                                            totalDriveTimeMinutes={day.totalDriveTimeMinutes}
-                                            totalDistanceKm={day.totalDistanceKm}
-                                            nightHalt={day.nightHalt}
-                                            isFirstDay={false}
-                                            isLastDay={idx === arr.length - 1}
-                                        />
-                                    ))}
-                                </>
-                            )}
+                                        {journeyDays.slice(Math.ceil(journeyDays.length / 2)).map((day, idx, arr) => (
+                                            <JourneyDayCard
+                                                key={`return-${day.dayNumber}`}
+                                                dayNumber={day.dayNumber}
+                                                date={day.date}
+                                                stops={day.stops}
+                                                segments={day.segments}
+                                                selectedStops={selectedStops}
+                                                onToggleStop={toggleStopSelection}
+                                                onFocusStop={setFocusedStopId}
+                                                totalDriveTimeMinutes={day.totalDriveTimeMinutes}
+                                                totalDistanceKm={day.totalDistanceKm}
+                                                nightHalt={day.nightHalt}
+                                                isFirstDay={false}
+                                                isLastDay={idx === arr.length - 1}
+                                            />
+                                        ))}
+                                    </>
+                                )}
 
-                            {tripType === 'one-way' && journeyDays.map((day, idx) => (
-                                <JourneyDayCard
-                                    key={day.dayNumber}
-                                    dayNumber={day.dayNumber}
-                                    date={day.date}
-                                    stops={day.stops}
-                                    segments={day.segments}
+                                {tripType === 'one-way' && journeyDays.map((day, idx) => (
+                                    <JourneyDayCard
+                                        key={day.dayNumber}
+                                        dayNumber={day.dayNumber}
+                                        date={day.date}
+                                        stops={day.stops}
+                                        segments={day.segments}
+                                        selectedStops={selectedStops}
+                                        onToggleStop={toggleStopSelection}
+                                        onFocusStop={setFocusedStopId}
+                                        totalDriveTimeMinutes={day.totalDriveTimeMinutes}
+                                        totalDistanceKm={day.totalDistanceKm}
+                                        nightHalt={day.nightHalt}
+                                        isFirstDay={idx === 0}
+                                        isLastDay={idx === journeyDays.length - 1}
+                                    />
+                                ))}
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="timeline"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <div className="mb-4">
+                                    <p className="text-sm text-gray-500">
+                                        Select attractions to add to your itinerary
+                                    </p>
+                                </div>
+
+                                <Timeline
+                                    stops={stops}
                                     selectedStops={selectedStops}
                                     onToggleStop={toggleStopSelection}
                                     onFocusStop={setFocusedStopId}
-                                    totalDriveTimeMinutes={day.totalDriveTimeMinutes}
-                                    totalDistanceKm={day.totalDistanceKm}
-                                    nightHalt={day.nightHalt}
-                                    isFirstDay={idx === 0}
-                                    isLastDay={idx === journeyDays.length - 1}
+                                    showNightHaltAfter={nightHaltAfterStopId}
                                 />
-                            ))}
-                        </div>
-                    ) : (
-                        <>
-                            <div className="mb-4">
-                                <p className="text-sm text-gray-500">
-                                    Select attractions to add to your itinerary
-                                </p>
-                            </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                            <Timeline
-                                stops={stops}
-                                selectedStops={selectedStops}
-                                onToggleStop={toggleStopSelection}
-                                onFocusStop={setFocusedStopId}
-                                showNightHaltAfter={nightHaltAfterStopId}
-                            />
-                        </>
-                    )}
-
-                    {/* Fare Breakdown */}
-                    <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-semibold text-slate-800">Fare Breakdown</h4>
-                            <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-full border border-slate-200">
-                                {activeStopsCount} attractions added
-                            </span>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Base Fare ({formatDistance(tripStats.totalDistanceKm)})</span>
-                                <span className="text-slate-800">{formatCurrency(tripStats.baseFare)}</span>
-                            </div>
-                            {tripStats.driverAllowance > 0 && (
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Driver Allowance ({tripStats.totalDays} day{tripStats.totalDays > 1 ? 's' : ''})</span>
-                                    <span className="text-slate-800">
-                                        +{formatCurrency(tripStats.driverAllowance)}
-                                    </span>
-                                </div>
-                            )}
-                            {tripStats.tollEstimate > 0 && (
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Estimated Tolls</span>
-                                    <span className="text-slate-800">
-                                        +{formatCurrency(tripStats.tollEstimate)}
-                                    </span>
-                                </div>
-                            )}
-                            {/* Route label if available */}
-                            {tripStats.routeLabel && (
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-500">Route</span>
-                                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                        {tripStats.routeLabel}
-                                    </span>
-                                </div>
-                            )}
-                            <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
-                                <span className="font-bold text-slate-800">Total</span>
-                                <span className="block text-right">
-                                    <span className="font-bold text-lg text-[#2563EB]">
-                                        {formatCurrency(tripStats.totalFare)}
-                                    </span>
-                                    <span className="block text-[10px] text-slate-400 font-normal">
-                                        All inclusive
-                                    </span>
+                    {/* Fare Breakdown — hidden in modal (BillingFooter handles it) */}
+                    {!isInModal && (
+                        <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-semibold text-slate-800">Fare Breakdown</h4>
+                                <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-full border border-slate-200">
+                                    {activeStopsCount} attractions added
                                 </span>
                             </div>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Base Fare ({formatDistance(tripStats.totalDistanceKm)})</span>
+                                    <span className="text-slate-800">{formatCurrency(tripStats.baseFare)}</span>
+                                </div>
+                                {tripStats.driverAllowance > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Driver Allowance ({tripStats.totalDays} day{tripStats.totalDays > 1 ? 's' : ''})</span>
+                                        <span className="text-slate-800">
+                                            +{formatCurrency(tripStats.driverAllowance)}
+                                        </span>
+                                    </div>
+                                )}
+                                {tripStats.tollEstimate > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Estimated Tolls</span>
+                                        <span className="text-slate-800">
+                                            +{formatCurrency(tripStats.tollEstimate)}
+                                        </span>
+                                    </div>
+                                )}
+                                {tripStats.routeLabel && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-slate-500">Route</span>
+                                        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                            {tripStats.routeLabel}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Total</span>
+                                    <span className="block text-right">
+                                        <span className="font-bold text-lg text-[#2563EB]">
+                                            {formatCurrency(tripStats.totalFare)}
+                                        </span>
+                                        <span className="block text-[10px] text-slate-400 font-normal">
+                                            All inclusive
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Map */}
@@ -620,6 +643,8 @@ export default function ScoutContainer({
                         selectedStopId={focusedStopId}
                         onStopClick={toggleStopSelection}
                         tripType={tripType}
+                        tripStats={tripStats}
+                        perKmRate={car.perKmRate}
                     />
                 </div>
             </div>

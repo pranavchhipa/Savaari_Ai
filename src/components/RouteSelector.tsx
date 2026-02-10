@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { RouteOption } from '@/types';
 import { formatCurrency, formatDuration, formatDistance, getRouteFareDifference } from '@/lib/calculateTripStats';
-import { Clock, Navigation, Zap, Mountain, Shield, Check, TrendingDown } from 'lucide-react';
+import { Clock, Navigation, Zap, Mountain, Shield, Check, TrendingDown, Ticket, ShieldCheck } from 'lucide-react';
 
 interface RouteSelectorProps {
     routes: RouteOption[];
@@ -69,7 +69,7 @@ export default function RouteSelector({
                 </div>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex gap-3 overflow-x-auto pb-2 pt-4 scrollbar-hide">
                 {routesWithFare.map((route, index) => {
                     const isSelected = route.id === selectedRouteId;
                     const fareDiff = getRouteFareDifference(recommendedFare, route.estimatedFare || 0);
@@ -82,8 +82,8 @@ export default function RouteSelector({
                             whileHover={{ scale: 1.02, y: -2 }}
                             whileTap={{ scale: 0.98 }}
                             className={`relative flex-shrink-0 min-w-[160px] md:min-w-[180px] p-4 rounded-xl border-2 transition-all ${isSelected
-                                    ? 'shadow-lg'
-                                    : 'border-gray-200 hover:border-gray-300 shadow-sm'
+                                ? 'shadow-lg'
+                                : 'border-gray-200 hover:border-gray-300 shadow-sm'
                                 } bg-gradient-to-br ${getRouteGradient(index, isSelected)}`}
                             style={{
                                 borderColor: isSelected ? accentColor : undefined,
@@ -134,6 +134,8 @@ export default function RouteSelector({
                                     </span>
                                 </div>
 
+                                {/* Toll Info - Moving to footer */}
+
                                 {/* Fare */}
                                 <div className="pt-2 border-t border-gray-200/60">
                                     <div className="font-bold text-sm" style={{ color: accentColor }}>
@@ -141,8 +143,8 @@ export default function RouteSelector({
                                     </div>
                                     {fareDiff && !route.isRecommended && (
                                         <div className={`text-[10px] font-medium ${(route.estimatedFare || 0) > recommendedFare
-                                                ? 'text-red-500'
-                                                : 'text-green-600'
+                                            ? 'text-red-500'
+                                            : 'text-green-600'
                                             }`}>
                                             {fareDiff} vs best
                                         </div>
@@ -150,19 +152,31 @@ export default function RouteSelector({
                                 </div>
                             </div>
 
-                            {/* Highlights */}
-                            {route.highlights && route.highlights.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                    {route.highlights.slice(0, 2).map((highlight, i) => (
-                                        <span
-                                            key={i}
-                                            className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-white/80 text-gray-600 border border-gray-200/50"
-                                        >
-                                            {highlight}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
+                            {/* Highlights & Tolls */}
+                            <div className="mt-3 pt-2 border-t border-gray-200/50 flex flex-wrap gap-1.5">
+                                {/* Toll Badge */}
+                                {route.tollInfo ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                        <Ticket className="w-3 h-3" />
+                                        Toll: {formatCurrency(route.tollInfo.estimatedPrice)}
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
+                                        <ShieldCheck className="w-3 h-3" />
+                                        No Toll
+                                    </span>
+                                )}
+
+                                {/* Other Highlights */}
+                                {route.highlights && route.highlights.slice(0, 2).map((highlight, i) => (
+                                    <span
+                                        key={i}
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-gray-50 text-gray-600 border border-gray-200"
+                                    >
+                                        {highlight}
+                                    </span>
+                                ))}
+                            </div>
                         </motion.button>
                     );
                 })}
