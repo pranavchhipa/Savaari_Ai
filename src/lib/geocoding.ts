@@ -1,4 +1,5 @@
 import { Location, NominatimResult } from '@/types';
+import { loadGoogleMapsScript } from '@/lib/maps';
 
 const NOMINATIM_API = 'https://nominatim.openstreetmap.org';
 
@@ -102,46 +103,51 @@ export async function searchLocations(query: string): Promise<Location[]> {
         }
     }
 
-    // Only call Nominatim if we need more results
+    // Only call Google Maps API if we need more results
     if (results.length < 5 && query.length >= 3) {
         try {
-            const response = await fetch(
-                `${NOMINATIM_API}/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=8&addressdetails=1&featuretype=city`,
-                {
-                    headers: {
-                        'User-Agent': 'SavaariScout/1.0',
-                    },
-                }
-            );
+            if (typeof window !== 'undefined') {
+                const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+                if (apiKey) await loadGoogleMapsScript(apiKey);
 
-            if (response.ok) {
-                const nominatimResults: NominatimResult[] = await response.json();
-
-                for (const result of nominatimResults) {
-                    if (results.length >= 5) break;
-
-                    const name = result.name || result.display_name.split(',')[0];
-                    const lat = parseFloat(result.lat);
-                    const lng = parseFloat(result.lon);
-                    const key = `${name.toLowerCase()}-${Math.round(lat * 100)}-${Math.round(lng * 100)}`;
-
-                    // Skip duplicates
-                    if (seenNames.has(key)) continue;
-
-                    // Skip very similar names already in results
-                    const isDuplicate = results.some(r =>
-                        r.name.toLowerCase() === name.toLowerCase() ||
-                        (Math.abs(r.lat - lat) < 0.01 && Math.abs(r.lng - lng) < 0.01)
-                    );
-                    if (isDuplicate) continue;
-
-                    seenNames.add(key);
-                    results.push({
-                        name,
-                        displayName: formatDisplayName(result.display_name),
-                        lat,
-                        lng,
+                if (window.google?.maps) {
+                    const geocoder = new window.google.maps.Geocoder();
+                    const googleResults = await new Promise<google.maps.GeocoderResult[]>((resolve) => {
+                        geocoder.geocode({
+                            address: query,
+                            componentRestrictions: { country: 'IN' }
+                        }, (res, status) => {
+                            if (status === 'OK' && res) resolve(res);
+                            else resolve([]);
+                        });
                     });
+
+                    for (const result of googleResults) {
+                        if (results.length >= 5) break;
+
+                        const name = result.address_components[0]?.long_name || result.formatted_address.split(',')[0];
+                        const lat = result.geometry.location.lat();
+                        const lng = result.geometry.location.lng();
+                        const key = `${name.toLowerCase()}-${Math.round(lat * 100)}-${Math.round(lng * 100)}`;
+
+                        // Skip duplicates
+                        if (seenNames.has(key)) continue;
+
+                        // Skip very similar names already in results
+                        const isDuplicate = results.some(r =>
+                            r.name.toLowerCase() === name.toLowerCase() ||
+                            (Math.abs(r.lat - lat) < 0.01 && Math.abs(r.lng - lng) < 0.01)
+                        );
+                        if (isDuplicate) continue;
+
+                        seenNames.add(key);
+                        results.push({
+                            name,
+                            displayName: result.formatted_address,
+                            lat,
+                            lng,
+                        });
+                    }
                 }
             }
         } catch (error) {
@@ -197,24 +203,50 @@ function levenshteinDistance(str1: string, str2: string): number {
 
 export async function reverseGeocode(lat: number, lng: number): Promise<Location | null> {
     try {
-        const response = await fetch(
-            `${NOMINATIM_API}/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-            {
-                headers: {
-                    'User-Agent': 'SavaariScout/1.0',
-                },
+        // Use Google Geocoding API for reverse geocoding (more accurate for India)
+        if (typeof window !== 'undefined') {
+            const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+            if (apiKey) await loadGoogleMapsScript(apiKey);
+
+            if (window.google?.maps) {
+                const geocoder = new window.google.maps.Geocoder();
+                const result = await new Promise<Location | null>((resolve) => {
+                    geocoder.geocode({ location: { lat, lng } }, (res, status) => {
+                        if (status === 'OK' && res && res.length > 0) {
+                            const r = res[0];
+                            const name = r.address_components?.[0]?.long_name ||
+                                r.formatted_address?.split(',')[0] || 'Unknown';
+                            resolve({
+                                name,
+                                displayName: r.formatted_address || `${lat}, ${lng}`,
+                                lat,
+                                lng,
+                            });
+                        } else {
+                            resolve(null);
+                        }
+                    });
+                });
+
+                if (result) return result;
             }
+        }
+
+        // Fallback to Nominatim
+        const nominatimResponse = await fetch(
+            `${NOMINATIM_API}/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+            { headers: { 'User-Agent': 'SavaariScout/1.0' } }
         );
 
-        if (!response.ok) throw new Error('Reverse geocoding failed');
+        if (!nominatimResponse.ok) throw new Error('Reverse geocoding failed');
 
-        const result: NominatimResult = await response.json();
+        const nominatimResult: NominatimResult = await nominatimResponse.json();
 
         return {
-            name: result.name || result.address?.city || 'Unknown',
-            displayName: formatDisplayName(result.display_name),
-            lat: parseFloat(result.lat),
-            lng: parseFloat(result.lon),
+            name: nominatimResult.name || nominatimResult.address?.city || 'Unknown',
+            displayName: formatDisplayName(nominatimResult.display_name),
+            lat: parseFloat(nominatimResult.lat),
+            lng: parseFloat(nominatimResult.lon),
         };
     } catch (error) {
         console.error('Reverse geocoding error:', error);

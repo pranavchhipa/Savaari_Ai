@@ -10,11 +10,13 @@ import ScoutTip from './ScoutTip';
 import JourneyHeader from './JourneyHeader';
 import JourneyDayCard from './JourneyDayCard';
 import DestinationChanger from './DestinationChanger';
+import RouteSelector from './RouteSelector';
+import RecommendationShowcase from './RecommendationShowcase';
 import { formatCurrency, formatDuration, formatDistance } from '@/lib/calculateTripStats';
-import { MapPin, Clock, Calendar, IndianRupee, Loader2, Route, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Clock, Calendar, IndianRupee, Loader2, Route, Sparkles } from 'lucide-react';
 
-// Dynamic import for LeafletMap (SSR-safe)
-const LeafletMap = dynamic(() => import('./LeafletMap'), {
+// Dynamic import for GoogleMap (SSR-safe)
+const GoogleMap = dynamic(() => import('./GoogleMap'), {
     ssr: false,
     loading: () => (
         <div className="w-full h-full min-h-[300px] bg-gray-100 rounded-xl flex items-center justify-center">
@@ -55,12 +57,19 @@ export default function ScoutContainer({
 
     const {
         routeData,
+        routeOptions,
+        selectedRouteId,
+        selectRoute,
         stops,
         selectedStops,
+        recommendations,
+        dontMiss,
         tripStats,
         isLoading,
         error,
         toggleStopSelection,
+        addRecommendationAsStop,
+        addedRecommendationIds,
         nightHaltSuggestion,
         scoutTip,
     } = useTripLogic({
@@ -102,19 +111,17 @@ export default function ScoutContainer({
 
         const segments: JourneySegment[] = [];
         const totalDistance = routeData.distanceKm;
-        const avgSpeedKmH = 40; // Average speed
+        const avgSpeedKmH = 40;
 
         for (let i = 0; i < stops.length - 1; i++) {
             const fromStop = stops[i];
             const toStop = stops[i + 1];
 
-            // Calculate approximate distance between stops
             const segmentRatio = 1 / (stops.length - 1);
             const segmentDistance = totalDistance * segmentRatio;
-            const segmentDuration = (segmentDistance / avgSpeedKmH) * 60; // in minutes
+            const segmentDuration = (segmentDistance / avgSpeedKmH) * 60;
 
-            // Calculate times
-            const startHour = 6; // 6 AM start
+            const startHour = 6;
             const preceedingDuration = i * (totalDistance / (stops.length - 1) / avgSpeedKmH);
             const departureHour = startHour + preceedingDuration;
             const arrivalHour = departureHour + (segmentDistance / avgSpeedKmH);
@@ -140,18 +147,16 @@ export default function ScoutContainer({
         return segments;
     }, [stops, routeData]);
 
-    // Group stops by day for multi-day trips
+    // Group stops by day
     const journeyDays = useMemo(() => {
         if (!tripStats || stops.length === 0) return [];
 
         const isRoundTrip = tripType === 'round-trip';
         const totalTripDays = tripStats.totalDays;
 
-        // Split stops by leg
         const onwardStops = stops.filter(s => s.leg !== 'return');
         const returnStops = stops.filter(s => s.leg === 'return');
 
-        // Determine days distribution
         let onwardDaysCount = totalTripDays;
         let returnDaysCount = 0;
 
@@ -175,28 +180,17 @@ export default function ScoutContainer({
             nightHalt?: string;
         }> = [];
 
-        // --- Generate Onward Days ---
-        // Calculate stops per day for onward leg
         const onwardStopsPerDay = Math.ceil(onwardStops.length / onwardDaysCount);
 
         for (let day = 0; day < onwardDaysCount; day++) {
             const startIdx = day * onwardStopsPerDay;
             const endIdx = Math.min(startIdx + onwardStopsPerDay, onwardStops.length);
             const dayStops = onwardStops.slice(startIdx, endIdx);
-
-            // Segments for this day - simplistic slicing of all segments?
-            // Since segments are generated from full stops list, we need to map them.
-            // But simpler: just accept dayStops and recalculate simplistic distance for UI
-            // or try to match them.
-            // For now, let's just pass empty segments or filter broadly.
-            // Actually, let's reuse the segment logic but filter it.
             const daySegments = journeySegments.filter(js => dayStops.includes(js.fromStop));
 
-            // Calculate day date
             const date = new Date(pickupDate);
             date.setDate(date.getDate() + day);
 
-            // Distance & Time
             const dayDistance = daySegments.reduce((sum, s) => sum + s.distanceKm, 0);
             const dayTime = daySegments.reduce((sum, s) => sum + s.durationMinutes, 0);
 
@@ -205,13 +199,12 @@ export default function ScoutContainer({
                 date: date.toISOString().split('T')[0],
                 stops: dayStops,
                 segments: daySegments,
-                totalDriveTimeMinutes: dayTime > 0 ? dayTime : (tripStats.totalDriveTimeHours * 60 / totalTripDays), // Fallback
+                totalDriveTimeMinutes: dayTime > 0 ? dayTime : (tripStats.totalDriveTimeHours * 60 / totalTripDays),
                 totalDistanceKm: dayDistance > 0 ? dayDistance : (tripStats.totalDistanceKm / (isRoundTrip ? 2 : 1) / onwardDaysCount),
                 nightHalt: day < onwardDaysCount - 1 ? nightHaltSuggestion?.suggestedCity : undefined,
             });
         }
 
-        // --- Generate Return Days ---
         if (isRoundTrip) {
             const returnStopsPerDay = Math.max(1, Math.ceil(returnStops.length / returnDaysCount));
 
@@ -220,10 +213,8 @@ export default function ScoutContainer({
                 const startIdx = i * returnStopsPerDay;
                 const endIdx = Math.min(startIdx + returnStopsPerDay, returnStops.length);
                 const dayStops = returnStops.slice(startIdx, endIdx);
-
                 const daySegments = journeySegments.filter(js => dayStops.includes(js.fromStop));
 
-                // Calculate date: if single day trip, same as pickup. Else offset.
                 const dayOffset = (totalTripDays === 1 ? 0 : onwardDaysCount + i);
                 const date = new Date(pickupDate);
                 date.setDate(date.getDate() + dayOffset);
@@ -235,7 +226,7 @@ export default function ScoutContainer({
                     date: date.toISOString().split('T')[0],
                     stops: dayStops,
                     segments: daySegments,
-                    totalDriveTimeMinutes: 0, // Simplified for return
+                    totalDriveTimeMinutes: 0,
                     totalDistanceKm: dayDistance > 0 ? dayDistance : (tripStats.totalDistanceKm / 2 / returnDaysCount),
                     nightHalt: i < returnDaysCount - 1 ? 'En route' : undefined,
                 });
@@ -257,9 +248,12 @@ export default function ScoutContainer({
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="text-center">
-                    <Loader2 className="w-12 h-12 text-[#2563EB] animate-spin mx-auto mb-4" />
-                    <p className="text-gray-600">Planning your journey...</p>
-                    <p className="text-sm text-gray-400 mt-1">Fetching route & generating stops</p>
+                    <div className="relative">
+                        <Loader2 className="w-12 h-12 text-[#2563EB] animate-spin mx-auto mb-4" />
+                        <Sparkles className="w-5 h-5 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
+                    </div>
+                    <p className="font-semibold text-gray-700">Sarathi AI is planning your journey...</p>
+                    <p className="text-sm text-gray-400 mt-1">Finding routes, attractions & hidden gems</p>
                 </div>
             </div>
         );
@@ -279,6 +273,8 @@ export default function ScoutContainer({
     if (!routeData || !tripStats) {
         return null;
     }
+
+    const activeStopsCount = selectedStops.filter(s => s.type !== 'start' && s.type !== 'end').length;
 
     return (
         <motion.div
@@ -302,7 +298,28 @@ export default function ScoutContainer({
                 />
             </div>
 
-            {/* Header Stats - Professional Blue Theme */}
+            {/* Route Selector — Multi-route comparison */}
+            {routeOptions.length > 1 && (
+                <RouteSelector
+                    routes={routeOptions}
+                    selectedRouteId={selectedRouteId}
+                    onRouteSelect={selectRoute}
+                    perKmRate={car.perKmRate}
+                    driverAllowancePerDay={car.driverAllowancePerDay}
+                />
+            )}
+
+            {/* AI Recommendation Showcase */}
+            {recommendations.length > 0 && (
+                <RecommendationShowcase
+                    recommendations={recommendations}
+                    dontMiss={dontMiss}
+                    onAddStop={addRecommendationAsStop}
+                    addedStopIds={addedRecommendationIds}
+                />
+            )}
+
+            {/* Header Stats */}
             <div className="p-4 bg-white border-b border-gray-100">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {/* Distance */}
@@ -344,18 +361,15 @@ export default function ScoutContainer({
                         </div>
                     </div>
 
-                    {/* Stops Added */}
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                        <div className="w-9 h-9 bg-[#2563EB] rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
-                            </svg>
+                    {/* Attractions Added */}
+                    <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                        <div className="w-9 h-9 bg-amber-500 rounded-lg flex items-center justify-center">
+                            <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <div className="text-[10px] uppercase tracking-wide text-blue-400 font-medium">Stops Added</div>
-                            <div className="font-bold text-[#2563EB] text-sm">
-                                {selectedStops.filter(s => s.type !== 'start' && s.type !== 'end').length} stops
+                            <div className="text-[10px] uppercase tracking-wide text-amber-500 font-medium">Attractions</div>
+                            <div className="font-bold text-amber-700 text-sm">
+                                {activeStopsCount} added
                             </div>
                         </div>
                     </div>
@@ -424,12 +438,10 @@ export default function ScoutContainer({
 
             {/* Main Content - Split View */}
             <div className="flex flex-col lg:flex-row min-h-[500px]">
-                {/* Journey Content (Left on Desktop, Bottom on Mobile) */}
+                {/* Journey Content */}
                 <div className="order-2 lg:order-1 w-full lg:w-2/5 p-4 lg:border-r border-gray-100 overflow-y-auto max-h-[600px]">
                     {viewMode === 'daywise' ? (
-                        /* Day-wise View */
                         <div className="space-y-4">
-                            {/* For Round Trip: Show Onward and Return sections */}
                             {tripType === 'round-trip' && journeyDays.length > 0 && (
                                 <>
                                     {/* Onward Journey Header */}
@@ -451,7 +463,6 @@ export default function ScoutContainer({
                                         </div>
                                     </div>
 
-                                    {/* Onward Days (first half) */}
                                     {journeyDays.slice(0, Math.ceil(journeyDays.length / 2)).map((day, idx) => (
                                         <JourneyDayCard
                                             key={`onward-${day.dayNumber}`}
@@ -489,7 +500,6 @@ export default function ScoutContainer({
                                         </div>
                                     </div>
 
-                                    {/* Return Days (second half) */}
                                     {journeyDays.slice(Math.ceil(journeyDays.length / 2)).map((day, idx, arr) => (
                                         <JourneyDayCard
                                             key={`return-${day.dayNumber}`}
@@ -510,7 +520,6 @@ export default function ScoutContainer({
                                 </>
                             )}
 
-                            {/* For One-way Trip: Show all days without split */}
                             {tripType === 'one-way' && journeyDays.map((day, idx) => (
                                 <JourneyDayCard
                                     key={day.dayNumber}
@@ -530,11 +539,10 @@ export default function ScoutContainer({
                             ))}
                         </div>
                     ) : (
-                        /* Timeline View */
                         <>
                             <div className="mb-4">
                                 <p className="text-sm text-gray-500">
-                                    Select stops to add to your itinerary
+                                    Select attractions to add to your itinerary
                                 </p>
                             </div>
 
@@ -553,44 +561,61 @@ export default function ScoutContainer({
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="font-semibold text-slate-800">Fare Breakdown</h4>
                             <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-full border border-slate-200">
-                                {selectedStops.filter(s => s.type !== 'start' && s.type !== 'end').length} stops added
+                                {activeStopsCount} attractions added
                             </span>
                         </div>
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Base Fare</span>
+                                <span className="text-slate-500">Base Fare ({formatDistance(tripStats.totalDistanceKm)})</span>
                                 <span className="text-slate-800">{formatCurrency(tripStats.baseFare)}</span>
                             </div>
-                            {tripStats.extraKmCharge > 0 && (
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Extra Km Charge</span>
-                                    <span className="text-slate-800">
-                                        +{formatCurrency(tripStats.extraKmCharge)}
-                                    </span>
-                                </div>
-                            )}
                             {tripStats.driverAllowance > 0 && (
                                 <div className="flex justify-between">
-                                    <span className="text-slate-500">Driver Allowance</span>
+                                    <span className="text-slate-500">Driver Allowance ({tripStats.totalDays} day{tripStats.totalDays > 1 ? 's' : ''})</span>
                                     <span className="text-slate-800">
                                         +{formatCurrency(tripStats.driverAllowance)}
                                     </span>
                                 </div>
                             )}
+                            {tripStats.tollEstimate > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Estimated Tolls</span>
+                                    <span className="text-slate-800">
+                                        +{formatCurrency(tripStats.tollEstimate)}
+                                    </span>
+                                </div>
+                            )}
+                            {/* Route label if available */}
+                            {tripStats.routeLabel && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">Route</span>
+                                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                        {tripStats.routeLabel}
+                                    </span>
+                                </div>
+                            )}
                             <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
                                 <span className="font-bold text-slate-800">Total</span>
-                                <span className="font-bold text-lg text-[#2563EB]">
-                                    {formatCurrency(tripStats.totalFare)}
+                                <span className="block text-right">
+                                    <span className="font-bold text-lg text-[#2563EB]">
+                                        {formatCurrency(tripStats.totalFare)}
+                                    </span>
+                                    <span className="block text-[10px] text-slate-400 font-normal">
+                                        All inclusive
+                                    </span>
                                 </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Map (Right on Desktop, Top on Mobile) */}
+                {/* Map */}
                 <div className="order-1 lg:order-2 w-full lg:w-3/5 h-[300px] lg:h-auto lg:sticky lg:top-0">
-                    <LeafletMap
+                    <GoogleMap
                         routeCoordinates={routeData.coordinates}
+                        alternativeRoutes={routeOptions}
+                        selectedRouteId={selectedRouteId}
+                        onRouteSelect={selectRoute}
                         stops={stops}
                         selectedStopId={focusedStopId}
                         onStopClick={toggleStopSelection}

@@ -21,6 +21,8 @@ import {
     Users,
     Car as CarIcon,
 } from 'lucide-react';
+import { getDistance } from '@/lib/geoUtils';
+import { calculateTripStats } from '@/lib/calculateTripStats';
 
 // Sample car data
 // Sample car data with FALLBACK prices (approx 300km Trip) to avoid ₹0 flash
@@ -179,32 +181,45 @@ export default function ListingPage() {
                 }
             }
 
-            // EAGER CALCULATION: Set approximate distance immediately to show realistic prices
-            // while waiting for the precise route API
-            import('@/lib/geoUtils').then(({ getDistance }) => {
-                const straightLineKm = getDistance(currentSource, currentDest);
-                const estimatedRoadKm = straightLineKm * 1.35; // Estimation factor
-                const estimatedDurationMin = (estimatedRoadKm / 45) * 60;
+            console.log('[ListingPage] Loading route for:', currentSource.name, '->', currentDest.name);
 
-                // Only set if we don't have precise data yet
-                setRouteData(prev => prev || {
-                    distanceKm: estimatedRoadKm,
-                    durationMinutes: estimatedDurationMin
-                });
+            // EAGER CALCULATION: Set approximate distance immediately to show realistic prices
+            // Now synchronous thanks to top-level import
+            const straightLineKm = getDistance(currentSource, currentDest);
+            const estimatedRoadKm = straightLineKm * 1.35; // Estimation factor
+            const estimatedDurationMin = (estimatedRoadKm / 45) * 60;
+
+            console.log('[ListingPage] Eager Calc:', { straightLineKm, estimatedRoadKm });
+
+            // Only set if we don't have precise data yet
+            setRouteData(prev => {
+                if (!prev) {
+                    console.log('[ListingPage] Setting Eager RouteData');
+                    return {
+                        distanceKm: estimatedRoadKm,
+                        durationMinutes: estimatedDurationMin
+                    };
+                }
+                return prev;
             });
 
             try {
-                const { getRoute } = await import('@/lib/routing');
-                console.log("Fetching route for:", currentSource.name, "to", currentDest.name);
-                const data = await getRoute(currentSource, currentDest);
+                const response = await fetch('/api/route', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start: currentSource, end: currentDest })
+                });
 
-                if (data) {
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('[ListingPage] API Success:', data);
                     setRouteData({
                         distanceKm: data.distanceKm,
                         durationMinutes: data.durationMinutes
                     });
                 } else {
-                    console.warn("No route data found.");
+                    const errorData = await response.json();
+                    console.error("Route API Error:", errorData);
                 }
             } catch (e) {
                 console.error("Route fetch failed", e);
@@ -218,13 +233,14 @@ export default function ListingPage() {
 
     // 2. Pricing Effect: Recalculate when Route or Trip Type changes
     useEffect(() => {
-        const calculatePrices = async () => {
+        const calculatePrices = () => {
             const currentRouteData = routeData;
+            console.log('[ListingPage] Pricing Effect Triggered:', { currentRouteData, tripType });
+
             if (!currentRouteData) return;
 
             try {
-                const { calculateTripStats } = await import('@/lib/calculateTripStats');
-
+                // Now synchronous
                 const updatedCars = sampleCars.map(car => {
                     const stats = calculateTripStats({
                         totalDistanceKm: currentRouteData.distanceKm,
@@ -241,6 +257,7 @@ export default function ListingPage() {
                         baseFare: stats.totalFare
                     };
                 });
+                console.log('[ListingPage] Updated Cars:', updatedCars.map(c => c.baseFare));
                 setCars(updatedCars);
             } catch (e) {
                 console.error("Price recalc failed", e);
@@ -284,7 +301,7 @@ export default function ListingPage() {
         }
 
         return result;
-    }, [sortBy, filters]);
+    }, [cars, sortBy, filters]);
 
     const carTypes = ['Hatchback', 'Sedan', 'SUV', 'MUV'];
     const activeFiltersCount = filters.carTypes.length + (filters.minSeats > 0 ? 1 : 0) + (filters.maxPrice < 50000 ? 1 : 0);

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const placeInfo = await getPlaceInfo(placeName, placeType, nearCity);
+        const placeInfo = await getPlaceInfo(placeName);
 
         if (!placeInfo) {
             return NextResponse.json(

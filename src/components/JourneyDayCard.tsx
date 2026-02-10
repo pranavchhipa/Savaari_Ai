@@ -134,7 +134,7 @@ export default function JourneyDayCard({
             {/* Timeline with Segments */}
             <div className="p-4">
                 {stops.map((stop, index) => (
-                    <div key={stop.id}>
+                    <div key={`${stop.id}-${index}`}>
                         {/* Timeline Item */}
                         <TimelineItem
                             stop={stop}

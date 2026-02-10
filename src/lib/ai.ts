@@ -1,414 +1,384 @@
-/**
- * Sarathi AI - OpenRouter Integration
- * 
- * Uses GPT-4o-mini for fast, high-quality responses
- * Cost: ~$0.15 per 1M input tokens, ~$0.60 per 1M output tokens
- */
+'use server';
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+import { AIRouteStopsResponse, AIRecommendation, StopBadge } from '@/types';
 
-// Using GPT-4o for maximum reliability and reasoning (User requested 'Best')
-const AI_MODEL = 'openai/gpt-4o';
+const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
-interface PlaceInfo {
-    description: string;
-    whyStopHere: string;
-    recommendedTime: string;
-    photoSpots: string[];
-    bestTimeToVisit?: string;
-    localTips?: string;
+// Cache for AI responses
+const aiCache = new Map<string, { data: AIRouteStopsResponse; timestamp: number }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+function getCacheKey(source: string, destination: string, distanceKm: number): string {
+    return `${source.toLowerCase()}-${destination.toLowerCase()}-${Math.round(distanceKm / 10) * 10}`;
 }
-
-interface AIResponse {
-    choices: {
-        message: {
-            content: string;
-        };
-    }[];
-}
-
-// Cache for place info to reduce API calls
-const placeInfoCache = new Map<string, { data: PlaceInfo; timestamp: number }>();
-const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-export async function getPlaceInfo(
-    placeName: string,
-    placeType: string,
-    nearCity?: string
-): Promise<PlaceInfo | null> {
-    const cacheKey = `${placeName}-${placeType}-${nearCity || ''}`;
-
-    // Check cache first
-    const cached = placeInfoCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        return cached.data;
-    }
-
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-        console.error('OpenRouter API key not configured');
-        return getDefaultPlaceInfo(placeName, placeType);
-    }
-
-    const prompt = `You are a travel expert for India. Provide a brief, engaging description for a traveler stopping at "${placeName}" ${nearCity ? `near ${nearCity}` : ''}.
-
-Place type: ${placeType}
-
-Respond in this exact JSON format (no markdown, just JSON):
-{
-    "description": "2-3 sentence engaging description of the place",
-    "whyStopHere": "One compelling reason to stop (max 15 words)",
-    "recommendedTime": "Suggested stop duration (e.g., '45-60 minutes')",
-    "photoSpots": ["spot1", "spot2"],
-    "bestTimeToVisit": "Best time of day (e.g., 'Sunrise' or 'Evening')",
-    "localTips": "One local insider tip"
-}`;
-
-    try {
-        const response = await fetch(OPENROUTER_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://savaari.com',
-                'X-Title': 'Sarathi AI Travel Planner',
-            },
-            body: JSON.stringify({
-                model: AI_MODEL,
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You are a helpful travel assistant specializing in Indian tourism. Provide concise, engaging descriptions that make travelers excited to visit places. Always respond in valid JSON format.',
-                    },
-                    {
-                        role: 'user',
-                        content: prompt,
-                    },
-                ],
-                max_tokens: 300,
-                temperature: 0.7,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OpenRouter API error:', response.status, errorText);
-            return getDefaultPlaceInfo(placeName, placeType);
-        }
-
-        const data: AIResponse = await response.json();
-        const content = data.choices[0]?.message?.content;
-
-        if (!content) {
-            return getDefaultPlaceInfo(placeName, placeType);
-        }
-
-        // Parse JSON response
-        const placeInfo = JSON.parse(content) as PlaceInfo;
-
-        // Cache the result
-        placeInfoCache.set(cacheKey, { data: placeInfo, timestamp: Date.now() });
-
-        return placeInfo;
-    } catch (error) {
-        console.error('Error fetching place info:', error);
-        return getDefaultPlaceInfo(placeName, placeType);
-    }
-}
-
-// Fallback descriptions based on place type
-function getDefaultPlaceInfo(placeName: string, placeType: string): PlaceInfo {
-    const defaults: Record<string, PlaceInfo> = {
-        heritage: {
-            description: `${placeName} is a historic landmark worth exploring. Rich in culture and architecture, it offers a glimpse into India's fascinating past.`,
-            whyStopHere: 'Perfect for history enthusiasts and photographers',
-            recommendedTime: '60-90 minutes',
-            photoSpots: ['Main entrance', 'Courtyard', 'Scenic viewpoint'],
-            bestTimeToVisit: 'Morning or late afternoon',
-            localTips: 'Hire a local guide for hidden stories',
-        },
-        viewpoint: {
-            description: `${placeName} offers breathtaking panoramic views that make for unforgettable memories. A perfect spot to stretch your legs and capture stunning photos.`,
-            whyStopHere: 'Spectacular views and photo opportunities',
-            recommendedTime: '20-30 minutes',
-            photoSpots: ['Main viewpoint', 'Sunrise point'],
-            bestTimeToVisit: 'Sunrise or sunset',
-            localTips: 'Arrive 30 minutes before sunset for best lighting',
-        },
-        restaurant: {
-            description: `${placeName} is a popular dining spot known for authentic local cuisine. A great place to refuel and experience regional flavors.`,
-            whyStopHere: 'Taste authentic local delicacies',
-            recommendedTime: '45-60 minutes',
-            photoSpots: ['Food presentation'],
-            bestTimeToVisit: 'Lunch or dinner time',
-            localTips: 'Try the local specialty dish',
-        },
-        food: {
-            description: `${placeName} is a beloved food stop along this route. Famous for its fresh preparations and quick service, it's a favorite among travelers.`,
-            whyStopHere: 'Famous highway food stop loved by travelers',
-            recommendedTime: '30-45 minutes',
-            photoSpots: ['Kitchen area', 'Food spread'],
-            localTips: 'Order the house special',
-        },
-        fuel: {
-            description: `${placeName} is a well-maintained fuel station with clean restrooms and refreshment options. Ideal for a quick break.`,
-            whyStopHere: 'Clean facilities and quick refueling',
-            recommendedTime: '15-20 minutes',
-            photoSpots: [],
-            localTips: 'Check tire pressure while here',
-        },
-        rest: {
-            description: `${placeName} offers a comfortable break point with refreshments and restroom facilities. Perfect for stretching after a long drive.`,
-            whyStopHere: 'Comfortable rest with good amenities',
-            recommendedTime: '20-30 minutes',
-            photoSpots: ['Surrounding area'],
-            localTips: 'Take a short walk to refresh',
-        },
-    };
-
-    return defaults[placeType] || {
-        description: `${placeName} is a recommended stop along your route. Consider adding it to your itinerary for a more enriching journey.`,
-        whyStopHere: 'A worthwhile addition to your trip',
-        recommendedTime: '30 minutes',
-        photoSpots: ['Scenic spots'],
-    };
-}
-
-// Generate trip theme suggestions
-export async function getTripThemes(
-    source: string,
-    destination: string,
-    stops: string[]
-): Promise<string[]> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) return ['Scenic Route', 'Heritage Trail', 'Foodie Journey'];
-
-    try {
-        const response = await fetch(OPENROUTER_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://savaari.com',
-                'X-Title': 'Sarathi AI Travel Planner',
-            },
-            body: JSON.stringify({
-                model: AI_MODEL,
-                messages: [
-                    {
-                        role: 'user',
-                        content: `Suggest 3 trip themes for a journey from ${source} to ${destination} passing through: ${stops.join(', ')}. 
-                        
-Return only a JSON array of theme names, e.g., ["Heritage Trail", "Food Explorer", "Nature Escape"]`,
-                    },
-                ],
-                max_tokens: 100,
-                temperature: 0.8,
-            }),
-        });
-
-        if (!response.ok) return ['Scenic Route', 'Heritage Trail', 'Foodie Journey'];
-
-        const data: AIResponse = await response.json();
-        const content = data.choices[0]?.message?.content;
-
-        return content ? JSON.parse(content) : ['Scenic Route', 'Heritage Trail', 'Foodie Journey'];
-    } catch {
-        return ['Scenic Route', 'Heritage Trail', 'Foodie Journey'];
-    }
-}
-
-// Generate "Don't Miss" recommendation
-export async function getDontMissRecommendation(
-    source: string,
-    destination: string,
-    currentStops: string[]
-): Promise<{ place: string; reason: string } | null> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) return null;
-
-    try {
-        const response = await fetch(OPENROUTER_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://savaari.com',
-                'X-Title': 'Sarathi AI Travel Planner',
-            },
-            body: JSON.stringify({
-                model: AI_MODEL,
-                messages: [
-                    {
-                        role: 'user',
-                        content: `For a trip from ${source} to ${destination}, already stopping at: ${currentStops.join(', ')}.
-
-Suggest ONE must-visit place they might be missing. Return JSON:
-{"place": "Place Name", "reason": "15-word compelling reason to add it"}`,
-                    },
-                ],
-                max_tokens: 100,
-                temperature: 0.9,
-            }),
-        });
-
-        if (!response.ok) return null;
-
-        const data: AIResponse = await response.json();
-        const content = data.choices[0]?.message?.content;
-
-        return content ? JSON.parse(content) : null;
-    } catch {
-        return null;
-    }
-}
-
-// Interface for AI-generated stops
-export interface AIGeneratedStop {
-    name: string;
-    type: 'heritage' | 'viewpoint' | 'restaurant' | 'food' | 'fuel' | 'rest';
-    description: string;
-    whyVisit: string;
-    approximateKm: number;
-    suggestedDuration: number;
-    famousFor?: string;
-    detourKm?: number;
-}
-
-export interface AIRouteStopsResponse {
-    stops: AIGeneratedStop[];
-    nightHalt?: {
-        city: string;
-        reason: string;
-        approximateKm: number;
-    };
-}
-
-// Cache for route stops
-const routeStopsCache = new Map<string, { data: AIRouteStopsResponse; timestamp: number }>();
 
 /**
- * Generate real, famous places along a route using AI
+ * Generate tourist-focused route recommendations using AI.
+ * As Savaari's product lead, this is our key differentiator:
+ * - Recommendations that make customers WANT to take detours
+ * - Each detour = more km = higher fare = more revenue
+ * - Better experience = higher engagement = repeat customers
  */
 export async function generateRouteStops(
     source: string,
     destination: string,
     distanceKm: number
 ): Promise<AIRouteStopsResponse | null> {
-    const cacheKey = `route-${source.toLowerCase()}-${destination.toLowerCase()}`;
+    const cacheKey = getCacheKey(source, destination, distanceKm);
 
-    // Check cache first
-    const cached = routeStopsCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    // Check cache
+    const cached = aiCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
         return cached.data;
     }
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-        console.error('OpenRouter API key not configured');
-        return null;
+        console.warn('[Sarathi AI] No API key configured, using intelligent fallback');
+        return generateIntelligentFallback(source, destination, distanceKm);
     }
 
     const needsNightHalt = distanceKm > 400;
 
-    const prompt = `You are an expert Indian travel planner and geographer. For a road trip from "${source}" to "${destination}" (approximately ${Math.round(distanceKm)} km):
+    const prompt = `You are Sarathi, Savaari's expert AI travel advisor for Indian road trips. You have deep knowledge of every tourist destination, cultural site, hidden gem, and legendary food stop across India.
 
-    Generate 10-12 REAL, HIGH-QUALITY stops that travelers would actually want to visit along this specific route.
-    
-    STRICT RULES:
-    1. Stops must be BETWEEN "${source}" and "${destination}" in the direction of travel.
-    2. Stops must be within 50km radius of the main highway route.
-    3. Do NOT suggest stops that require significant backtracking.
-    4. Focus on: 
-       - Famous Highway Dhabas/Food Courts (Real names only)
-       - Scenic Viewpoints & Nature Spots
-       - Historic Temples & Heritage Sites
-       - Clean Rest Stops for families
-    
-    ${needsNightHalt ? `Since this is a long journey (${Math.round(distanceKm)} km), also identify the BEST city for a night halt roughly midway.` : ''}
-    
-    Respond in this exact JSON format (no markdown, just valid JSON):
-    {
-        "stops": [
-            {
-                "name": "Exact Name",
-                "type": "heritage|viewpoint|restaurant|food|fuel|rest",
-                "description": "Engaging description",
-                "whyVisit": "Compelling reason",
-                "approximateKm": 150,
-                "detourKm": 5,
-                "suggestedDuration": 60,
-                "famousFor": "Famous feature"
-            }
-        ]${needsNightHalt ? `,
-        "nightHalt": {
-            "city": "City Name",
-            "reason": "Why this is a good stop",
-            "approximateKm": ${Math.round(distanceKm / 2)}
-        }` : ''}
-    }`;
+For a road trip from "${source}" to "${destination}" (approximately ${Math.round(distanceKm)} km):
+
+Generate 8-10 MUST-VISIT tourist attractions and experiences that travelers would LOVE to discover along this specific route. Think like a passionate local guide who knows the BEST places.
+
+RECOMMENDATION PRIORITIES (most important first):
+1. 🏛️ UNESCO Sites, National Monuments, Famous Temples, Historic Forts
+2. 🌊 Waterfalls, Lakes, National Parks, Scenic Natural Wonders  
+3. 📸 Instagram-worthy Viewpoints, Sunrise/Sunset spots
+4. 🎭 Cultural experiences, Traditional Markets, Artisan Villages
+5. 🍛 LEGENDARY food stops - famous dhabas, regional specialties that people drive hours for
+6. 🏔️ Adventure spots - trekking points, river crossings, eco-tourism
+
+STRICT RULES:
+- ONLY include REAL, VERIFIABLE places with correct names
+- Places MUST be along or near this specific road route (within 30km detour max)
+- Sort by DISTANCE from source (approximateKm)
+- Each place must be genuinely worth stopping for - no generic rest stops
+- Focus on places that will make travelers say "I'm SO glad we stopped here!"
+- descriptions should be vivid, engaging travel writing (2 sentences max)
+- whyVisit should be a single compelling hook that makes someone pull over
+
+For BADGES, assign based on real quality:
+- "must-visit": Famous enough that skipping would be a regret
+- "hidden-gem": Lesser-known but extraordinary
+- "instagram-worthy": Visually stunning, photo-worthy
+- "family-friendly": Great for kids and families
+- "off-the-beaten-path": Unique, adventurous, not touristy
+
+Respond in this EXACT JSON format (no markdown, only valid JSON):
+{
+    "stops": [
+        {
+            "name": "Exact Real Place Name",
+            "type": "heritage|tourist|nature|adventure|cultural|viewpoint|food",
+            "description": "Vivid 2-sentence description",
+            "whyVisit": "One compelling hook",
+            "famousFor": "What makes it iconic",
+            "rating": 4.5,
+            "badges": ["must-visit", "instagram-worthy"],
+            "approximateKm": 85,
+            "detourKm": 3,
+            "suggestedDuration": 45,
+            "bestTimeToVisit": "morning"
+        }
+    ]${needsNightHalt ? `,
+    "nightHalt": {
+        "city": "Best City to Stay",
+        "reason": "Why this is the ideal overnight stop",
+        "approximateKm": ${Math.round(distanceKm * 0.45)}
+    }` : ''},
+    "dontMiss": [
+        {
+            "name": "Top Pick Name",
+            "type": "heritage",
+            "description": "This is THE reason to take this route",
+            "whyVisit": "Unforgettable experience",
+            "famousFor": "World-famous feature",
+            "rating": 5,
+            "badges": ["must-visit"],
+            "approximateKm": 120,
+            "detourKm": 2,
+            "suggestedDuration": 60,
+            "bestTimeToVisit": "anytime"
+        }
+    ]
+}`;
 
     try {
-        const response = await fetch(OPENROUTER_API_URL, {
+        const response = await fetch(OPENROUTER_API, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
                 'HTTP-Referer': 'https://savaari.com',
-                'X-Title': 'Sarathi AI Travel Planner',
+                'X-Title': 'Savaari - Sarathi AI',
             },
             body: JSON.stringify({
-                model: AI_MODEL,
+                model: 'openai/gpt-4o',
                 messages: [
                     {
                         role: 'system',
-                        content: 'You are an expert Indian travel and road trip planner. You have extensive knowledge of highways, tourist spots, famous dhabas, and attractions across India. Always suggest REAL places that exist. Respond only in valid JSON format.',
+                        content: 'You are Sarathi, an expert Indian travel planner. Respond ONLY with valid JSON, no markdown formatting.'
                     },
-                    {
-                        role: 'user',
-                        content: prompt,
-                    },
+                    { role: 'user', content: prompt }
                 ],
-                max_tokens: 800,
                 temperature: 0.7,
+                max_tokens: 3000,
             }),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OpenRouter API error:', response.status, errorText);
-            return null;
+            console.error('[Sarathi AI] API Error:', response.status);
+            return generateIntelligentFallback(source, destination, distanceKm);
         }
 
-        const data: AIResponse = await response.json();
-        const content = data.choices[0]?.message?.content;
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
 
         if (!content) {
-            return null;
+            return generateIntelligentFallback(source, destination, distanceKm);
         }
 
-        // Clean the response - remove markdown code blocks if present
+        // Parse JSON, handling potential markdown wrapper
         let cleanContent = content.trim();
-        if (cleanContent.startsWith('```json')) {
-            cleanContent = cleanContent.slice(7);
-        }
         if (cleanContent.startsWith('```')) {
-            cleanContent = cleanContent.slice(3);
+            cleanContent = cleanContent.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
         }
-        if (cleanContent.endsWith('```')) {
-            cleanContent = cleanContent.slice(0, -3);
+
+        const parsed = JSON.parse(cleanContent) as AIRouteStopsResponse;
+
+        // Validate and enhance stops
+        if (parsed.stops && Array.isArray(parsed.stops)) {
+            parsed.stops = parsed.stops
+                .filter(stop => stop.name && stop.type && stop.approximateKm >= 0)
+                .map((stop, index) => ({
+                    ...stop,
+                    id: `ai-stop-${index}`,
+                    rating: Math.min(5, Math.max(1, stop.rating || 4)),
+                    badges: validateBadges(stop.badges),
+                    detourKm: Math.min(30, stop.detourKm || 5),
+                    suggestedDuration: stop.suggestedDuration || 30,
+                    type: validateStopType(stop.type),
+                }));
+
+            // Sort by approximateKm
+            parsed.stops.sort((a, b) => a.approximateKm - b.approximateKm);
         }
-        cleanContent = cleanContent.trim();
 
-        // Parse JSON response
-        const routeStops = JSON.parse(cleanContent) as AIRouteStopsResponse;
+        // Ensure dontMiss is populated
+        if (!parsed.dontMiss || !Array.isArray(parsed.dontMiss) || parsed.dontMiss.length === 0) {
+            // Pick top 3 rated stops as "Don't Miss"
+            parsed.dontMiss = [...(parsed.stops || [])]
+                .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                .slice(0, 3)
+                .map((stop, i) => ({
+                    ...stop,
+                    id: `dont-miss-${i}`,
+                    badges: ['must-visit' as StopBadge, ...(stop.badges || []).filter(b => b !== 'must-visit')],
+                }));
+        }
 
-        // Cache the result
-        routeStopsCache.set(cacheKey, { data: routeStops, timestamp: Date.now() });
+        // Cache
+        aiCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
 
-        return routeStops;
+        console.log(`[Sarathi AI] Generated ${parsed.stops?.length || 0} recommendations for ${source} → ${destination}`);
+        return parsed;
+
     } catch (error) {
-        console.error('Error generating route stops:', error);
+        console.error('[Sarathi AI] Error:', error);
+        return generateIntelligentFallback(source, destination, distanceKm);
+    }
+}
+
+function validateStopType(type: string): AIRecommendation['type'] {
+    const validTypes = ['tourist', 'heritage', 'nature', 'adventure', 'cultural', 'viewpoint', 'food', 'restaurant'];
+    if (validTypes.includes(type)) return type as AIRecommendation['type'];
+    // Map old types to new
+    if (type === 'fuel' || type === 'rest') return 'tourist';
+    return 'tourist';
+}
+
+function validateBadges(badges: unknown): StopBadge[] {
+    if (!Array.isArray(badges)) return [];
+    const validBadges: StopBadge[] = ['must-visit', 'hidden-gem', 'instagram-worthy', 'family-friendly', 'off-the-beaten-path'];
+    return badges.filter(b => validBadges.includes(b as StopBadge)) as StopBadge[];
+}
+
+/**
+ * Intelligent fallback when AI is unavailable.
+ * Uses curated data for popular Indian routes.
+ */
+function generateIntelligentFallback(
+    source: string,
+    destination: string,
+    distanceKm: number
+): AIRouteStopsResponse {
+    const srcLower = source.toLowerCase();
+    const destLower = destination.toLowerCase();
+
+    // Popular route database — curated by product team
+    const popularRoutes: Record<string, AIRecommendation[]> = {
+        'bangalore-mysore': [
+            {
+                id: 'fb-1', name: 'Ramanagara', type: 'nature',
+                description: 'The "Sholay" filming location with dramatic rocky outcrops. A paradise for rock climbing enthusiasts and Bollywood fans alike.',
+                whyVisit: 'Stand where Bollywood history was made', famousFor: 'Sholay filming location & rock climbing',
+                rating: 4.2, badges: ['instagram-worthy', 'family-friendly'], approximateKm: 50, detourKm: 2, suggestedDuration: 30, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-2', name: 'Channapatna Toy Town', type: 'cultural',
+                description: 'UNESCO-recognized wooden toy-making tradition dating back to Tipu Sultan era. Watch artisans craft colorful lacquerware toys by hand.',
+                whyVisit: 'Buy authentic handcrafted toys from centuries-old workshops', famousFor: 'Traditional wooden toys & lacquerware',
+                rating: 4.0, badges: ['hidden-gem', 'family-friendly'], approximateKm: 65, detourKm: 1, suggestedDuration: 40, bestTimeToVisit: 'anytime',
+            },
+            {
+                id: 'fb-3', name: 'Srirangapatna', type: 'heritage',
+                description: 'The island fortress where Tipu Sultan made his last stand. Explore the summer palace, dungeons, and the sacred Ranganathaswamy Temple.',
+                whyVisit: 'Walk through a fortress that changed Indian history', famousFor: 'Tipu Sultan Fort & Ranganathaswamy Temple',
+                rating: 4.7, badges: ['must-visit', 'family-friendly'], approximateKm: 120, detourKm: 3, suggestedDuration: 60, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-4', name: 'Kamat Lokaruchi', type: 'food',
+                description: 'Legendary highway restaurant serving authentic Karnataka thali for over 50 years. The filter coffee here is the stuff of road-trip legends.',
+                whyVisit: 'The most famous pit stop on the Bangalore-Mysore highway', famousFor: 'Karnataka thali & filter coffee',
+                rating: 4.3, badges: ['must-visit'], approximateKm: 80, detourKm: 0, suggestedDuration: 45, bestTimeToVisit: 'anytime',
+            },
+            {
+                id: 'fb-5', name: 'Brindavan Gardens', type: 'tourist',
+                description: 'The iconic illuminated musical fountain gardens at KRS Dam. A mesmerizing spectacle of water, light, and music after sunset.',
+                whyVisit: 'One of India\'s most famous garden experiences', famousFor: 'Musical fountain & illuminated gardens',
+                rating: 4.5, badges: ['must-visit', 'instagram-worthy', 'family-friendly'], approximateKm: 140, detourKm: 5, suggestedDuration: 90, bestTimeToVisit: 'evening',
+            },
+        ],
+        'bangalore-goa': [
+            {
+                id: 'fb-1', name: 'Chitradurga Fort', type: 'heritage',
+                description: 'The impregnable "Stone Fortress" with 19 gateways and Onake Obavva\'s legendary battle site. Karnataka\'s most dramatic hilltop fort.',
+                whyVisit: 'India\'s most visually dramatic stone fortress', famousFor: 'Stone fortress & Onake Obavva legend',
+                rating: 4.6, badges: ['must-visit', 'instagram-worthy'], approximateKm: 200, detourKm: 5, suggestedDuration: 90, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-2', name: 'Hampi Ruins', type: 'heritage',
+                description: 'UNESCO World Heritage Site - the spectacular ruins of the Vijayanagara Empire. Boulder-strewn landscape with ancient temples beyond imagination.',
+                whyVisit: 'A UNESCO wonder that will leave you speechless', famousFor: 'Vijayanagara ruins & boulder landscape',
+                rating: 5.0, badges: ['must-visit', 'instagram-worthy'], approximateKm: 350, detourKm: 30, suggestedDuration: 180, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-3', name: 'Jog Falls', type: 'nature',
+                description: 'India\'s second-highest plunge waterfall, thundering 253 meters down. During monsoon, the mist can be seen from kilometers away.',
+                whyVisit: 'Witness India\'s most powerful waterfall', famousFor: 'Second-highest plunge waterfall in India',
+                rating: 4.8, badges: ['must-visit', 'instagram-worthy'], approximateKm: 380, detourKm: 25, suggestedDuration: 120, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-4', name: 'Dandeli Wildlife Sanctuary', type: 'adventure',
+                description: 'White-water rafting in the Kali River and spotting hornbills in pristine Western Ghats forest. The adventure capital of Karnataka.',
+                whyVisit: 'Rafting, jungle safari & birdwatching in one stop', famousFor: 'White-water rafting & hornbill spotting',
+                rating: 4.5, badges: ['off-the-beaten-path', 'instagram-worthy'], approximateKm: 450, detourKm: 15, suggestedDuration: 120, bestTimeToVisit: 'morning',
+            },
+            {
+                id: 'fb-5', name: 'Dudhsagar Falls', type: 'nature',
+                description: 'The "Sea of Milk" - a breathtaking 310m waterfall straddling the Goa-Karnataka border. Accessible via an unforgettable jeep safari through the forest.',
+                whyVisit: 'India\'s most photogenic waterfall', famousFor: '310m waterfall & jeep safari',
+                rating: 4.9, badges: ['must-visit', 'instagram-worthy'], approximateKm: 530, detourKm: 20, suggestedDuration: 150, bestTimeToVisit: 'morning',
+            },
+        ],
+    };
+
+    // Try to find a matching route
+    const routeKey = `${srcLower}-${destLower}`;
+    const reverseKey = `${destLower}-${srcLower}`;
+    let stops = popularRoutes[routeKey] || popularRoutes[reverseKey];
+
+    if (!stops) {
+        // Generate generic but engaging stops based on distance
+        stops = generateGenericTouristStops(source, destination, distanceKm);
+    }
+
+    const needsNightHalt = distanceKm > 400;
+
+    return {
+        stops,
+        nightHalt: needsNightHalt ? {
+            city: 'Midpoint City',
+            reason: 'Rest after a long drive for a fresh start tomorrow',
+            approximateKm: Math.round(distanceKm * 0.45),
+        } : undefined,
+        dontMiss: [...stops]
+            .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 3)
+            .map((s, i) => ({ ...s, id: `dont-miss-${i}`, badges: ['must-visit' as StopBadge, ...(s.badges || []).filter(b => b !== 'must-visit')] })),
+        fallback: true,
+    };
+}
+
+function generateGenericTouristStops(source: string, destination: string, distanceKm: number): AIRecommendation[] {
+    const stopCount = Math.min(8, Math.max(4, Math.floor(distanceKm / 80)));
+    const stops: AIRecommendation[] = [];
+    const types: AIRecommendation['type'][] = ['heritage', 'viewpoint', 'food', 'nature', 'cultural', 'tourist'];
+
+    for (let i = 0; i < stopCount; i++) {
+        const progress = (i + 1) / (stopCount + 1);
+        const km = Math.round(distanceKm * progress);
+        const type = types[i % types.length];
+
+        stops.push({
+            id: `gen-${i}`,
+            name: `Scenic Stop ${i + 1}`,
+            type,
+            description: `A beautiful ${type} stop along the ${source} to ${destination} route. Worth a quick visit to stretch your legs and soak in the surroundings.`,
+            whyVisit: `Experience the beauty of the ${source}-${destination} corridor`,
+            famousFor: `Local ${type} attraction`,
+            rating: 3.5 + Math.random(),
+            badges: i === 0 ? ['must-visit'] : i === stopCount - 1 ? ['hidden-gem'] : [],
+            approximateKm: km,
+            detourKm: Math.round(Math.random() * 10 + 2),
+            suggestedDuration: 30 + Math.round(Math.random() * 30),
+            bestTimeToVisit: 'anytime',
+        });
+    }
+
+    return stops;
+}
+
+/**
+ * Get place information for a specific location
+ */
+export async function getPlaceInfo(placeName: string): Promise<string | null> {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) return null;
+
+    try {
+        const response = await fetch(OPENROUTER_API, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://savaari.com',
+                'X-Title': 'Savaari - Sarathi AI',
+            },
+            body: JSON.stringify({
+                model: 'openai/gpt-4o',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a concise travel expert. Provide a 2-3 sentence description of the given place.'
+                    },
+                    { role: 'user', content: `Tell me about ${placeName} in India as a travel destination.` }
+                ],
+                temperature: 0.5,
+                max_tokens: 200,
+            }),
+        });
+
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || null;
+    } catch {
         return null;
     }
 }

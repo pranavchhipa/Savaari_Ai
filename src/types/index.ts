@@ -1,4 +1,4 @@
-// TypeScript interfaces for Savaari Scout
+// TypeScript interfaces for Savaari
 
 export interface Location {
   name: string;
@@ -7,10 +7,26 @@ export interface Location {
   lng: number;
 }
 
+// Enhanced stop types — tourist-focused, no generic fuel/rest stops
+export type StopType =
+  | 'start'
+  | 'end'
+  | 'tourist'
+  | 'heritage'
+  | 'nature'
+  | 'adventure'
+  | 'cultural'
+  | 'viewpoint'
+  | 'food'
+  | 'restaurant'
+  | 'night_halt';
+
+export type StopBadge = 'must-visit' | 'hidden-gem' | 'instagram-worthy' | 'family-friendly' | 'off-the-beaten-path';
+
 export interface Stop {
   id: string;
   name: string;
-  type: 'start' | 'end' | 'restaurant' | 'viewpoint' | 'heritage' | 'fuel' | 'rest' | 'night_halt' | 'food';
+  type: StopType;
   location: Location;
   duration: number; // in minutes
   isSelected?: boolean;
@@ -18,6 +34,12 @@ export interface Stop {
   description?: string;
   detourKm?: number;
   leg?: 'onward' | 'return';
+  // Enhanced fields for tourist recommendations
+  rating?: number;           // AI-estimated 1-5
+  badges?: StopBadge[];
+  famousFor?: string;
+  bestTimeToVisit?: string;
+  imageQuery?: string;       // For generating placeholder images
 }
 
 export interface TripDay {
@@ -44,8 +66,10 @@ export interface TripStats {
   baseFare: number;
   extraKmCharge: number;
   driverAllowance: number;
-  totalFare: number;
+  tollEstimate: number;          // Toll rolled into total
+  totalFare: number;             // Includes tolls
   suggestedNightHalt?: string;
+  routeLabel?: string;           // "Fastest", "Scenic", etc.
 }
 
 export interface Car {
@@ -68,10 +92,35 @@ export interface RoutePoint {
   lng: number;
 }
 
+// Route alternative for multi-route selection
+export interface RouteOption {
+  id: string;
+  label: string;              // "Fastest Route", "Scenic Route", etc.
+  description?: string;       // "Via NH-48" from Google
+  coordinates: RoutePoint[];
+  distanceKm: number;
+  durationMinutes: number;
+  tollInfo?: {
+    estimatedPrice: number;
+    currency: string;
+  };
+  isRecommended?: boolean;
+  highlights?: string[];      // "Via NH-48", "Avoids tolls"
+  estimatedFare?: number;     // Pre-calculated for comparison
+  color?: string;             // Polyline color
+}
+
 export interface RouteData {
   coordinates: RoutePoint[];
   distanceKm: number;
   durationMinutes: number;
+  tollInfo?: {
+    estimatedPrice: number;
+    currency: string;
+  };
+  // Multi-route support
+  alternativeRoutes?: RouteOption[];
+  selectedRouteId?: string;
 }
 
 export interface SearchParams {
@@ -105,4 +154,33 @@ export interface OSRMRoute {
   };
   distance: number;
   duration: number;
+}
+
+// AI Recommendation types
+export interface AIRecommendation {
+  id: string;
+  name: string;
+  type: StopType;
+  description: string;
+  whyVisit: string;
+  famousFor: string;
+  rating: number;
+  badges: StopBadge[];
+  approximateKm: number;
+  detourKm: number;
+  suggestedDuration: number;
+  bestTimeToVisit?: string;
+  imageQuery?: string;
+}
+
+export interface AIRouteStopsResponse {
+  stops: AIRecommendation[];
+  nightHalt?: {
+    city: string;
+    reason: string;
+    approximateKm: number;
+  };
+  dontMiss?: AIRecommendation[];   // Top 3 must-visit
+  fallback?: boolean;
+  error?: string;
 }

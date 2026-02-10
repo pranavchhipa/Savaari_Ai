@@ -1,142 +1,225 @@
+// Page updated at ${new Date().toISOString()}
+'use client';
+
 import SearchWidget from '@/components/SearchWidget';
-import { Car, Shield, Clock, Star, MapPin } from 'lucide-react';
+import Logo from '@/components/Logo';
+import { Car, Shield, Clock, MapPin, Star, Zap, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#E0F2FE] via-[#F1F5F9] to-[#FFEDD5]">
-      {/* Hero Section */}
-      <section className="relative pt-6 pb-24 md:pt-10 md:pb-32 overflow-hidden">
-        {/* Background Decorations */}
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-orange-400/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-blue-100/50 to-orange-100/50 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-white">
+      {/* Hero Section with Background Image */}
+      <section className="relative pt-6 pb-24 md:pt-10 md:pb-32 overflow-hidden bg-gray-900">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop"
+            alt="Scenic road trip background"
+            className="w-full h-full object-cover opacity-60"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/80 to-transparent" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero Content */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-[#2563EB] rounded-full text-sm font-medium mb-6">
-              <Star className="w-4 h-4 fill-current" />
-              <span>India's Most Trusted Car Rental</span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-12"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md text-white/90 rounded-full text-sm font-medium mb-8 border border-white/20 shadow-lg"
+            >
+              <Star className="w-3.5 h-3.5 text-[#F97316] fill-[#F97316]" />
+              <span>India&apos;s Most Trusted Car Rental</span>
+            </motion.div>
+
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight tracking-tight drop-shadow-2xl">
               Road Trips,{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] to-[#7C3AED]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#60A5FA] via-[#818CF8] to-[#A78BFA]">
                 Reimagined
               </span>
             </h1>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-              Experience seamless outstation travel with <span className="font-semibold text-[#F97316]">Sarathi AI™</span>.
-              Smart routes, perfect stops, and unforgettable memories.
+
+            <p className="text-lg md:text-xl text-gray-200 max-w-2xl mx-auto mb-2 leading-relaxed drop-shadow-md">
+              Experience seamless outstation travel with{' '}
+              <span className="font-semibold text-[#F97316]">Sarathi AI™</span>.
             </p>
-          </div>
+            <p className="text-sm md:text-base text-gray-300 max-w-xl mx-auto drop-shadow-md">
+              Smart routes, hidden gems, and transparent pricing — all in one place.
+            </p>
+          </motion.div>
 
           {/* Search Widget */}
           <SearchWidget />
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section - Minimal Cards */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 tracking-tight">
               Why Choose Savaari?
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Experience hassle-free travel with verified drivers, transparent pricing, and 24x7 support.
+            <p className="text-gray-500 max-w-xl mx-auto">
+              Hassle-free travel with verified drivers, transparent pricing, and 24×7 support.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Feature 1 */}
-            <div className="group p-6 bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-100 hover:shadow-xl hover:shadow-blue-100/50 transition-all duration-300">
-              <div className="w-14 h-14 bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/20">
-                <Car className="w-7 h-7 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Premium Fleet</h3>
-              <p className="text-gray-600 text-sm">
-                Wide range of well-maintained cars from sedans to SUVs for every budget.
-              </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="group p-6 bg-gradient-to-br from-green-50 to-white rounded-2xl border border-green-100 hover:shadow-xl hover:shadow-green-100/50 transition-all duration-300">
-              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-green-500/20">
-                <Shield className="w-7 h-7 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Verified Drivers</h3>
-              <p className="text-gray-600 text-sm">
-                Background-verified, professional drivers with excellent track records.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="group p-6 bg-gradient-to-br from-orange-50 to-white rounded-2xl border border-orange-100 hover:shadow-xl hover:shadow-orange-100/50 transition-all duration-300">
-              <div className="w-14 h-14 bg-gradient-to-br from-[#F97316] to-[#EA580C] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-orange-500/20">
-                <Clock className="w-7 h-7 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">24x7 Support</h3>
-              <p className="text-gray-600 text-sm">
-                Round-the-clock customer support for any assistance during your trip.
-              </p>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="group p-6 bg-gradient-to-br from-purple-50 to-white rounded-2xl border border-purple-100 hover:shadow-xl hover:shadow-purple-100/50 transition-all duration-300">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/20">
-                <MapPin className="w-7 h-7 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Sarathi™ AI Planner</h3>
-              <p className="text-gray-600 text-sm">
-                Smart trip planning with suggested stops, routes, and real-time pricing.
-              </p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              {
+                icon: Car,
+                title: 'Premium Fleet',
+                desc: 'Well-maintained sedans to SUVs for every budget and journey.',
+                color: '#2563EB',
+                bg: 'from-blue-50 to-white',
+                border: 'border-blue-100',
+              },
+              {
+                icon: Shield,
+                title: 'Verified Drivers',
+                desc: 'Background-verified, professional drivers you can trust.',
+                color: '#10B981',
+                bg: 'from-emerald-50 to-white',
+                border: 'border-emerald-100',
+              },
+              {
+                icon: Clock,
+                title: '24×7 Support',
+                desc: 'Round-the-clock assistance for any help during your trip.',
+                color: '#F97316',
+                bg: 'from-orange-50 to-white',
+                border: 'border-orange-100',
+              },
+              {
+                icon: Zap,
+                title: 'Sarathi™ AI',
+                desc: 'Smart route planning with curated stops and live pricing.',
+                color: '#7C3AED',
+                bg: 'from-purple-50 to-white',
+                border: 'border-purple-100',
+              },
+            ].map((feature, i) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className={`group p-6 bg-gradient-to-br ${feature.bg} rounded-2xl border ${feature.border} hover:shadow-xl transition-all duration-300 cursor-default`}
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg"
+                  style={{ backgroundColor: feature.color, boxShadow: `0 8px 24px ${feature.color}30` }}
+                >
+                  <feature.icon className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1.5">{feature.title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8]">
+      {/* Stats Section - Redesigned */}
+      <section className="py-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">50L+</div>
-              <div className="text-blue-200">Happy Customers</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">300+</div>
-              <div className="text-blue-200">Cities Covered</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">4.8★</div>
-              <div className="text-blue-200">Average Rating</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">10K+</div>
-              <div className="text-blue-200">Verified Drivers</div>
+          <div className="relative bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-3xl p-10 md:p-14 overflow-hidden">
+            {/* Decorative elements */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#2563EB]/10 rounded-full blur-[80px]" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#F97316]/10 rounded-full blur-[60px]" />
+
+            {/* Dotted grid */}
+            <div
+              className="absolute inset-0 opacity-[0.04]"
+              style={{
+                backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+                backgroundSize: '32px 32px',
+              }}
+            />
+
+            <div className="relative grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
+              {[
+                { value: '50L+', label: 'Happy Customers', icon: '🎉' },
+                { value: '300+', label: 'Cities Covered', icon: '📍' },
+                { value: '4.8★', label: 'Average Rating', icon: '⭐' },
+                { value: '10K+', label: 'Verified Drivers', icon: '🚗' },
+              ].map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="text-center"
+                >
+                  <div className="text-2xl mb-3">{stat.icon}</div>
+                  <div className="text-3xl md:text-4xl font-bold text-white mb-1 tracking-tight">
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-gray-400 font-medium">{stat.label}</div>
+                </motion.div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 bg-gray-900 text-white">
+      {/* CTA Section */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 tracking-tight">
+              Ready to hit the road?
+            </h2>
+            <p className="text-gray-500 max-w-lg mx-auto mb-8">
+              Book your cab in under 2 minutes. Let Sarathi AI plan the perfect journey for you.
+            </p>
+            <a
+              href="#"
+              onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white font-semibold rounded-xl shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all"
+            >
+              Plan Your Trip
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer - Clean */}
+      <footer className="py-10 bg-[#0F172A]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] rounded-xl flex items-center justify-center">
-                <MapPin className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <span className="text-xl font-bold">Savaari</span>
-                <span className="ml-2 text-sm text-gray-400">Sarathi™</span>
+              <Logo className="w-10 h-10" />
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-bold text-white">Savaari</span>
+                <span className="text-[10px] font-medium text-gray-500 uppercase">Powered by Sarathi AI</span>
               </div>
             </div>
-            <div className="text-center md:text-right text-gray-400 text-sm">
+            <div className="text-center md:text-right text-gray-500 text-sm">
               <p>© 2024 Savaari Car Rentals. All rights reserved.</p>
-              <p className="mt-1">Made with ❤️ for travelers across India</p>
+              <p className="mt-1 text-gray-600">Made with ❤️ for travelers across India</p>
             </div>
           </div>
         </div>

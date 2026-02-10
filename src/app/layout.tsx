@@ -13,13 +13,13 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Sarathi AI - Intelligent Road Trip Planner",
-  description: "Experience the future of road trips with Sarathi AI. Smart route planning, curated stops, and seamless outstation car rentals. Your journey, reimagined.",
-  keywords: "Sarathi AI, AI trip planner, road trip planner, outstation cabs, car rental, smart travel",
+  title: "Savaari — Road Trips, Reimagined | Powered by Sarathi AI",
+  description: "Experience the future of road trips with Savaari, powered by Sarathi AI. Smart route planning, curated stops, and seamless outstation car rentals.",
+  keywords: "Savaari, Sarathi AI, AI trip planner, road trip planner, outstation cabs, car rental India",
   openGraph: {
-    title: "Sarathi AI - Intelligent Road Trip Planner",
-    description: "Plan your perfect road trip with AI. Smart routes, hidden gems, and seamless bookings.",
-    siteName: "Sarathi AI",
+    title: "Savaari — Road Trips, Reimagined | Powered by Sarathi AI",
+    description: "Plan your perfect road trip with Savaari. Smart routes, hidden gems, and seamless bookings — powered by Sarathi AI.",
+    siteName: "Savaari",
     images: [{
       url: "/opengraph-image",
     }],

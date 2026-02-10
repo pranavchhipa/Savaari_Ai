@@ -1,6 +1,16 @@
-import { TripStats, Stop } from '@/types';
+import { Stop, StopType, TripStats } from '@/types';
 
-interface TripStatsInput {
+/**
+ * Savaari Trip Pricing Engine
+ *
+ * Product decisions as Savaari's AI product lead:
+ * - Tolls are INCLUDED in total fare (customer simplicity)
+ * - Minimum 300km/day billing (industry standard)
+ * - Adding tourist stops = more detour km = higher fare (good for revenue)
+ * - Route type affects pricing: scenic routes get standard rate, all routes fair
+ */
+
+interface CalculateTripStatsParams {
     totalDistanceKm: number;
     durationMinutes: number;
     selectedStops: Stop[];
@@ -8,105 +18,78 @@ interface TripStatsInput {
     perKmRate: number;
     driverAllowancePerDay: number;
     tripType: 'one-way' | 'round-trip';
+    tollEstimate?: number;
+    routeLabel?: string;
 }
 
-export function calculateTripStats(input: TripStatsInput): TripStats {
-    const {
-        totalDistanceKm,
-        durationMinutes,
-        selectedStops,
-        baseFare,
-        perKmRate,
-        driverAllowancePerDay,
-        tripType,
-    } = input;
-
-    // Calculate total stop time (excluding start/end which are waypoints, not stops)
-    const actualStops = selectedStops.filter(s => s.type !== 'start' && s.type !== 'end');
-    const totalStopTimeMinutes = actualStops.reduce(
-        (acc, stop) => acc + (stop.duration || 0),
-        0
-    );
-
-    // For round trip, double the distance and driving time
+export function calculateTripStats({
+    totalDistanceKm,
+    durationMinutes,
+    selectedStops,
+    baseFare,
+    perKmRate,
+    driverAllowancePerDay,
+    tripType,
+    tollEstimate = 0,
+    routeLabel,
+}: CalculateTripStatsParams): TripStats {
+    // For round trips, double the distance
     const effectiveDistance = tripType === 'round-trip' ? totalDistanceKm * 2 : totalDistanceKm;
-    const effectiveDriveMinutes = tripType === 'round-trip' ? durationMinutes * 2 : durationMinutes;
 
-    // Total trip time = driving time + stop time (stops visited once, not doubled for round trip)
-    const totalTripTimeMinutes = effectiveDriveMinutes + totalStopTimeMinutes;
-    const totalTripTimeHours = totalTripTimeMinutes / 60;
-    const driveTimeHours = effectiveDriveMinutes / 60;
+    // Total drive hours
+    const totalDriveTimeHours = durationMinutes / 60;
+    const effectiveDriveTime = tripType === 'round-trip' ? totalDriveTimeHours * 2 : totalDriveTimeHours;
 
-    // Calculate number of days needed (10-hour effective driving limit per day, accounting for breaks)
-    const maxEffectiveHoursPerDay = 10;
-    let totalDays = 1;
+    // Calculate days based on drive time + stop durations
+    const stopDurationHours = selectedStops.reduce((acc, stop) => {
+        if (stop.type === 'start' || stop.type === 'end') return acc;
+        return acc + (stop.duration || 30) / 60;
+    }, 0);
 
-    if (totalTripTimeHours > maxEffectiveHoursPerDay) {
-        totalDays = Math.ceil(totalTripTimeHours / maxEffectiveHoursPerDay);
+    const totalTravelHours = effectiveDriveTime + stopDurationHours;
+
+    // Calculate total days: 10 hours driving per day max
+    const maxDrivingHoursPerDay = 10;
+    let totalDays = Math.max(1, Math.ceil(totalTravelHours / maxDrivingHoursPerDay));
+
+    // For round trip, minimum 2 days for trips > 200km one way
+    if (tripType === 'round-trip' && totalDistanceKm > 200) {
+        totalDays = Math.max(2, totalDays);
     }
 
-    // --- Dynamic Pricing Calculation ---
-    // Standard Outstation Logic:
-    // 1. Min charge distance per day (e.g. 300km)
-    // 2. Round trip charges for return distance (already doubled effectively)
-    // 3. Driver allowance per day
-
-    const minKmPerDay = 300;
-
-    // Billing Effective Distance
-    // Calculate billable distance: Max of (Actual Distance, Total Days * Min Km/Day)
-    const minBillableKm = totalDays * minKmPerDay;
+    // Minimum billable distance: 300km per day (industry standard)
+    const minBillableKmPerDay = 300;
+    const minBillableKm = totalDays * minBillableKmPerDay;
     const billableDistance = Math.max(effectiveDistance, minBillableKm);
 
-    // Base Fare is effectively 0 in this dynamic model, or we can use it as a 'Booking Fee' if needed.
-    // But for "Actual Pricing", we usually just do Distance * Rate.
-    // If input baseFare is provided (from static data), we might ignore it or use it as a minimum floor.
-    // Let's rely on perKmRate.
-
+    // Fare calculation
     const distanceCharge = billableDistance * perKmRate;
-
-    // Driver allowance
     const driverAllowance = totalDays * driverAllowancePerDay;
 
-    // Total Fare
-    // We add a small platform fee or just uses the calc.
-    // For now: Distance Charge + Driver Allowance.
-    // If billableDistance > effectiveDistance, the "Extra Km" concept is slightly different.
-    // It's just "Billable Km".
-    // To match the UI fields:
-    // baseFare in UI could mean "Fixed Charge" or we can repurpose fields.
-    // Let's make:
-    // baseFare = Billable Distance * Rate (The core travel cost)
-    // extraKmCharge = 0 (since we already covered everything in baseFare/billable logic)
-    // driverAllowance = as calc.
+    // Toll is included in total fare — customer simplicity
+    const effectiveToll = tripType === 'round-trip' ? tollEstimate * 2 : tollEstimate;
 
     const finalBaseFare = distanceCharge;
-    const finalTotalFare = finalBaseFare + driverAllowance;
-
-    // Suggest night halt if single-day trip time exceeds 12 hours (more realistic for India) or 
-    // if driving time is very long.
-    let suggestedNightHalt: string | undefined;
-    if (driveTimeHours > 10 && totalDays > 1) {
-        const midpointStop = actualStops[Math.floor(actualStops.length / 2)];
-        if (midpointStop) {
-            suggestedNightHalt = `Near ${midpointStop.name}`;
-        }
-    }
+    const finalTotalFare = finalBaseFare + driverAllowance + effectiveToll;
 
     return {
-        totalDistanceKm: effectiveDistance,
-        totalDriveTimeHours: driveTimeHours,
+        totalDistanceKm: Math.round(effectiveDistance),
+        totalDriveTimeHours: Math.round(effectiveDriveTime * 10) / 10,
         totalDays,
-        baseFare: Math.round(finalBaseFare), // This now represents the Distance Charge
-        extraKmCharge: 0, // Simplified: Everything is in baseFare based on billable km
-        driverAllowance,
+        baseFare: Math.round(finalBaseFare),
+        extraKmCharge: 0,
+        driverAllowance: Math.round(driverAllowance),
+        tollEstimate: Math.round(effectiveToll),
         totalFare: Math.round(finalTotalFare),
-        suggestedNightHalt,
+        routeLabel,
     };
 }
 
-// Format currency in INR
+/**
+ * Format currency in INR
+ */
 export function formatCurrency(amount: number): string {
+    if (amount === 0) return '₹0';
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
@@ -115,49 +98,90 @@ export function formatCurrency(amount: number): string {
     }).format(amount);
 }
 
-// Format duration
+/**
+ * Format duration
+ */
 export function formatDuration(hours: number): string {
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
-
     if (h === 0) return `${m} min`;
     if (m === 0) return `${h} hr`;
-    return `${h} hr ${m} min`;
+    return `${h}h ${m}m`;
 }
 
-// Format distance
+/**
+ * Format distance
+ */
 export function formatDistance(km: number): string {
+    if (km < 1) return `${Math.round(km * 1000)} m`;
     return `${Math.round(km)} km`;
 }
 
-// Get stop type icon
-export function getStopTypeIcon(type: Stop['type']): string {
-    const icons: Record<Stop['type'], string> = {
-        start: '🚗',
-        end: '🏁',
-        restaurant: '🍽️',
-        viewpoint: '📸',
-        heritage: '🏛️',
-        fuel: '⛽',
-        rest: '☕',
-        night_halt: '🌙',
-        food: '🍽️',
+/**
+ * Get color for stop type — tourist-focused palette
+ */
+export function getStopTypeColor(type: StopType): string {
+    const colors: Record<string, string> = {
+        start: '#2563EB',      // Blue
+        end: '#F97316',        // Orange
+        tourist: '#8B5CF6',    // Purple
+        heritage: '#D97706',   // Amber/Gold
+        nature: '#059669',     // Green
+        adventure: '#DC2626',  // Red
+        cultural: '#7C3AED',   // Violet
+        viewpoint: '#0891B2',  // Cyan
+        food: '#EA580C',       // Deep Orange
+        restaurant: '#EA580C', // Deep Orange
+        night_halt: '#6366F1', // Indigo
     };
-    return icons[type] || '📍';
+    return colors[type] || '#6B7280';
 }
 
-// Get stop type color - Professional unified blue/slate theme
-export function getStopTypeColor(type: Stop['type']): string {
-    const colors: Record<Stop['type'], string> = {
-        start: '#2563EB',      // Blue - Primary brand color
-        end: '#1E40AF',        // Dark blue - Destination
-        restaurant: '#475569', // Slate - Food stops
-        viewpoint: '#6366F1',  // Indigo - Scenic spots
-        heritage: '#4F46E5',   // Indigo-violet - Heritage
-        fuel: '#64748B',       // Slate gray - Fuel
-        rest: '#475569',       // Slate - Rest stops
-        night_halt: '#1E3A8A', // Dark blue - Night
-        food: '#475569',       // Slate - Food
+/**
+ * Get emoji icon for stop type
+ */
+export function getStopTypeIcon(type: StopType): string {
+    const icons: Record<string, string> = {
+        start: '🚗',
+        end: '📍',
+        tourist: '⭐',
+        heritage: '🏛️',
+        nature: '🌿',
+        adventure: '🏔️',
+        cultural: '🎭',
+        viewpoint: '📸',
+        food: '🍛',
+        restaurant: '🍛',
+        night_halt: '🌙',
     };
-    return colors[type] || '#64748B';
+    return icons[type] || '📌';
+}
+
+/**
+ * Get label for stop type
+ */
+export function getStopTypeLabel(type: StopType): string {
+    const labels: Record<string, string> = {
+        start: 'Start',
+        end: 'Destination',
+        tourist: 'Tourist Spot',
+        heritage: 'Heritage Site',
+        nature: 'Nature',
+        adventure: 'Adventure',
+        cultural: 'Cultural',
+        viewpoint: 'Viewpoint',
+        food: 'Famous Food',
+        restaurant: 'Restaurant',
+        night_halt: 'Night Stay',
+    };
+    return labels[type] || 'Stop';
+}
+
+/**
+ * Calculate fare difference between two routes
+ */
+export function getRouteFareDifference(baseFare: number, compareFare: number): string {
+    const diff = compareFare - baseFare;
+    if (diff === 0) return '';
+    return diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff);
 }

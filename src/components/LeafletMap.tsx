@@ -177,13 +177,15 @@ function getStopIcon(type: Stop['type']): string {
     const icons: Record<Stop['type'], string> = {
         start: '🚗',
         end: '🏁',
-        restaurant: '🍽️',
-        viewpoint: '📸',
+        tourist: '⭐',
         heritage: '🏛️',
-        fuel: '⛽',
-        rest: '☕',
+        nature: '🌿',
+        adventure: '🏔️',
+        cultural: '🎭',
+        viewpoint: '📸',
+        food: '🍛',
+        restaurant: '🍽️',
         night_halt: '🌙',
-        food: '🍽️',
     };
     return icons[type] || '📍';
 }

@@ -69,6 +69,7 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
         baseFare: car.baseFare,
         extraKmCharge: 0,
         driverAllowance: 0,
+        tollEstimate: 0,
         totalFare: currentPrice,
     };
 
