@@ -1,0 +1,87 @@
+# B2B Portal Upgrade & Agent Onboarding Blueprint
+
+This document outlines the strategy for upgrading the Savaari B2B platform, focusing specifically on the Agent Onboarding UI flow, backend optimizations for pricing, and the integration of the Wallet system, as requested for your tech team discussions.
+
+---
+
+## 1. Architectural Strategy: B2C Codebase for B2B
+**Recommendation:** Your Engineering Lead is absolutely right. Do **not** try to upgrade the legacy Angular 4/5 app. It is too old and will be full of deprecated packages.
+*   **Action:** Fork (copy) the current modern **B2C website codebase** (which is built on React/Next.js) and configure it to be the new B2B environment.
+*   **Why?** You get modern UI components, incredibly fast page loads, and mobile responsiveness out-of-the-box. We just need to strip out the "Guest" checkout flows and replace them with the "Agent" logged-in workflows.
+
+---
+
+## 2. Agent Onboarding & Account Management (UI & Backend)
+
+The B2B platform is strictly gated. No guest traffic is allowed. Below is the breakdown of what elements go where.
+
+### A. Agent Registration UI (`/register`)
+This is where new agents apply to join the Savaari B2B network.
+*   **UI Elements (Frontend):**
+    *   **Agency Details Form:** Agency Name, GST Number (Optional/Mandatory toggle), PAN Card upload field.
+    *   **Contact Details Form:** Agent Name, Email Address, Mobile Number (with OTP verification button).
+    *   **Security:** Password creation fields.
+*   **Backend Changes Required:**
+    *   Create a dedicated `POST /api/b2b/agent/register` endpoint.
+    *   Insert data into an `sv_agents` (or similar) table with a default `status = PENDING_APPROVAL`.
+    *   *System Action:* Trigger an internal email/notification to the Savaari Admin team to review and approve the agent.
+
+### B. Agent Login UI (`/login`)
+This replaces the standard B2C homepage for unauthenticated users.
+*   **UI Elements (Frontend):**
+    *   Clean, professional login card.
+    *   Inputs: Email or Registered Mobile Number.
+    *   Input: Password.
+    *   Alternative: "Login via OTP" taking mobile number.
+*   **Backend Changes Required:**
+    *   Modify the existing `partner_api/public/auth/webtoken` to explicitly issue a **B2B Agent JWT Token** (e.g., setting `role: "B2B_AGENT"` inside the token).
+    *   Ensure the token contains the `agent_id` so all subsequent API calls know exactly whose wallet or markup to apply.
+
+### C. Agent Account Management UI (`/account`)
+Once logged in, the Agent needs a control center (accessible via a dropdown on the top right NavBar).
+*   **UI Elements (Frontend):**
+    *   **Profile Tab:** View Name, Email. (Note per docs: UI should mention "To update Email or GST, contact customer care" and disable those fields).
+    *   **Markup Settings Tab (Critical):** Form to configure how much profit they make.
+        *   Radio selection: "Flat Amount (₹)" or "Percentage (%)".
+        *   Inputs categorized by trip: Airport, Local, Outstation.
+    *   **Manage Wallet Tab:** Add funds button, Current Balance display (Links to the Wallet flow).
+*   **Backend Changes Required:**
+    *   `POST /api/b2b/agent/markup` to save these preferences to the database. The pricing engine will later fetch this to calculate the final UI display price.
+
+---
+
+## 3. Backend Optimization: Fixing the 5-7 Sec Pricing Delay
+
+This is a major pain point. A 5-7 second wait during booking ruins the B2B experience. The core issue is likely that the PHP backend (`partner_api/public/availabilities`) is calculating base fares, tolls, dynamic pricing, and vendor checks synchronously every single time.
+
+**How to present the optimization plan to the tech team:**
+
+1.  **Implement Redis Caching (The Biggest Win):**
+    *   Base cab fares from City A to City B don't change every minute. The backend must heavily utilize an in-memory database like **Redis**.
+    *   When an agent searches a route, the backend checks Redis first. If the base price is there, it returns it instantly (**<50 milliseconds** instead of 5 seconds). Only if the route is new or dynamic inventory is empty should it hit the slow MySQL database.
+2.  **Decouple Agent Markup from Core Pricing:**
+    *   Do not make the heavy PHP backend calculate every specific agent's markup on the fly.
+    *   The backend should *only* return the raw **B2B Base Supplier Rate**.
+    *   The Next.js Frontend (or a lightweight Node middleware) takes that raw rate, looks at the Agent's stored Markup rules (e.g., +10%), and calculates the final numbers locally in the browser instantly.
+3.  **Database Indexing:**
+    *   The database tables handling routes and pricing *must* be analyzed. Ensure there are composite indexes on `(source_city, destination_city, vehicle_type)`. Without indexes, a large database scan will always take seconds.
+
+---
+
+## 4. Internal Wallet System Integration (High Level)
+
+Based on the provided TRD, the Wallet is the financial backbone of the new B2B platform.
+
+*   **UI Dashboard (`/wallet`):**
+    *   **Top Banner:** Bold display of `Available Balance`.
+    *   **Call to Action:** "Top-Up Wallet" button triggering the Razorpay modal.
+    *   **Data Table:** A transaction history table pulling from the `sv_wallet_transactions` table showing Credits (Top-ups/Refunds) and Debits (Bookings) with Dates and reference IDs.
+*   **Backend Critical Rule (For Tech Team):**
+    *   The engineering team must implement **Row-Level Locking (`FOR UPDATE` in SQL)** for all wallet transactions. Because multiple bookings could happen at once, failing to lock the database row during a debit could result in the agent double-spending money they don't have.
+
+---
+
+### **Summary of Your Next Steps for the Meeting:**
+1.  **Agree on the Foundation:** Confirm copying the B2C code to use for B2B.
+2.  **Lock in the Onboarding:** Show them the 3-step UI (Register -> Approve -> Login & Markup setup).
+3.  **Demand Pricing Speed:** Instruct the backend team to investigate **Redis Caching** for the `/availabilities` API immediately to solve the 5-7 second lag.
