@@ -46,6 +46,20 @@ export default function B2BHeader() {
                             Get App
                         </button>
 
+                        {/* Agent Wallet Balance - Global Visibility */}
+                        <div
+                            className="hidden md:flex items-center bg-blue-50 border border-blue-100 rounded-full pl-3 pr-4 py-1 shadow-sm cursor-pointer hover:bg-blue-100 transition-colors"
+                            onClick={() => router.push('/b2b-demo/wallet')}
+                        >
+                            <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center mr-2 shadow-sm">
+                                <Wallet className="w-3.5 h-3.5 text-[#1FA6DD]" />
+                            </div>
+                            <div className="flex flex-col justify-center">
+                                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider leading-none mb-0.5">Wallet Balance</span>
+                                <span className="text-xs font-black text-gray-900 leading-none">₹24,500</span>
+                            </div>
+                        </div>
+
                         {/* Authenticated user pill - Click to open instead of hover for better UX */}
                         <div className="relative" ref={dropdownRef}>
                             <button

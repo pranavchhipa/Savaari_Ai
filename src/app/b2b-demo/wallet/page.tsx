@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft, Filter, Download, X, Shield, IndianRupee } from 'lucide-react';
+import { ArrowLeft, Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft, Filter, Download, X, Shield, IndianRupee, RefreshCcw, UploadCloud } from 'lucide-react';
 import B2BHeader from '../components/B2BHeader';
 import { useState } from 'react';
 
@@ -12,6 +12,12 @@ export default function WalletDashboard() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [walletBalance, setWalletBalance] = useState(24500);
+
+    // Refund Modal States
+    const [showRefundModal, setShowRefundModal] = useState(false);
+    const [refundForm, setRefundForm] = useState({ pnr: '', reason: '', details: '' });
+    const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
+    const [refundSuccess, setRefundSuccess] = useState(false);
 
     // Dummy transaction history reflecting the PRD requirements
     const [transactions, setTransactions] = useState([
@@ -102,13 +108,22 @@ export default function WalletDashboard() {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => setShowTopUpModal(true)}
-                                className="bg-white text-[#1FA6DD] hover:bg-gray-50 px-8 py-4 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 flex items-center justify-center gap-2 whitespace-nowrap"
-                            >
-                                <PlusCircle className="w-5 h-5" />
-                                Add Funds
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    onClick={() => setShowRefundModal(true)}
+                                    className="bg-[#1578A3] text-white border border-blue-400/30 hover:bg-[#116285] px-6 py-3 md:py-4 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 flex items-center justify-center gap-2 whitespace-nowrap"
+                                >
+                                    <RefreshCcw className="w-5 h-5" />
+                                    Claim Refund
+                                </button>
+                                <button
+                                    onClick={() => setShowTopUpModal(true)}
+                                    className="bg-white text-[#1FA6DD] hover:bg-gray-50 px-6 py-3 md:py-4 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 flex items-center justify-center gap-2 whitespace-nowrap"
+                                >
+                                    <PlusCircle className="w-5 h-5" />
+                                    Add Funds
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -290,6 +305,130 @@ export default function WalletDashboard() {
                                         disabled={!topUpAmount || Number(topUpAmount) <= 0}
                                     >
                                         Proceed to Pay
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Refund Request Modal */}
+            {showRefundModal && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                        {refundSuccess ? (
+                            <div className="p-8 text-center bg-blue-50 flex-1 flex flex-col justify-center">
+                                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-sm">
+                                    <Shield className="w-10 h-10 text-[#1FA6DD]" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Refund Request Submitted</h3>
+                                <p className="text-gray-600 font-medium mb-6">Your request for PNR <strong>{refundForm.pnr}</strong> has been forwarded to the finance team. Typical resolution time is 24-48 hours. If approved, the amount will be credited directly to your wallet.</p>
+                                <button
+                                    onClick={() => {
+                                        setShowRefundModal(false);
+                                        setRefundSuccess(false);
+                                        setRefundForm({ pnr: '', reason: '', details: '' });
+                                    }}
+                                    className="px-6 py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                                >
+                                    Close & Return to Wallet
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50 shrink-0">
+                                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                        <RefreshCcw className="w-5 h-5 text-[#1FA6DD]" />
+                                        Request Refund / Dispute
+                                    </h3>
+                                    <button onClick={() => setShowRefundModal(false)} className="text-gray-400 hover:bg-gray-200 p-1.5 rounded-full transition-colors">
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                                    <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex gap-3 text-sm mb-2">
+                                        <Shield className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                                        <div className="text-orange-900">
+                                            <p className="font-bold mb-1">Refund Policy Notice</p>
+                                            <p className="text-xs font-medium leading-relaxed opacity-90">Refunds are applicable for cancelled bookings, toll disputes, and overcharges. Only valid PNRs will be processed. False claims may result in agent account suspension.</p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Booking Reference (PNR) *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. SBN-8821"
+                                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1FA6DD]/50 focus:border-[#1FA6DD] text-sm font-semibold transition-all"
+                                            value={refundForm.pnr}
+                                            onChange={(e) => setRefundForm({ ...refundForm, pnr: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Reason for Refund *</label>
+                                        <select
+                                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1FA6DD]/50 focus:border-[#1FA6DD] text-sm font-semibold transition-all appearance-none"
+                                            value={refundForm.reason}
+                                            onChange={(e) => setRefundForm({ ...refundForm, reason: e.target.value })}
+                                        >
+                                            <option value="" disabled>Select a reason...</option>
+                                            <option value="cancellation">Booking Cancelled before trip</option>
+                                            <option value="driver_noshow">Driver No-Show</option>
+                                            <option value="toll_dispute">Toll/Parking Dispute</option>
+                                            <option value="overcharge">Billed for Extra KMs incorrectly</option>
+                                            <option value="other">Other Adjustments</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Additional Details</label>
+                                        <textarea
+                                            placeholder="Please provide any contextual details that will help our team process this faster..."
+                                            rows={3}
+                                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1FA6DD]/50 focus:border-[#1FA6DD] text-sm transition-all resize-none"
+                                            value={refundForm.details}
+                                            onChange={(e) => setRefundForm({ ...refundForm, details: e.target.value })}
+                                        ></textarea>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Supporting Documents</label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer cursor-not-allowed opacity-70">
+                                            <UploadCloud className="w-8 h-8 text-gray-400" />
+                                            <p className="text-sm font-medium text-gray-600">Click to upload screenshots</p>
+                                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">JPG, PNG, PDF up to 5MB</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 border-t border-gray-100 flex gap-3 bg-gray-50 shrink-0">
+                                    <button
+                                        onClick={() => setShowRefundModal(false)}
+                                        className="flex-1 py-3 text-sm font-bold text-gray-600 hover:bg-gray-200 bg-gray-100 border border-transparent rounded-xl transition-colors disabled:opacity-50"
+                                        disabled={isSubmittingRefund}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsSubmittingRefund(true);
+                                            setTimeout(() => {
+                                                setIsSubmittingRefund(false);
+                                                setRefundSuccess(true);
+                                            }, 1500);
+                                        }}
+                                        className={`flex-[2] py-3 text-sm font-bold text-white rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${refundForm.pnr && refundForm.reason ? 'bg-[#1FA6DD] hover:bg-[#1889B6] hover:shadow-lg' : 'bg-gray-300 cursor-not-allowed shadow-none'}`}
+                                        disabled={!refundForm.pnr || !refundForm.reason || isSubmittingRefund}
+                                    >
+                                        {isSubmittingRefund ? (
+                                            <>
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                Submitting...
+                                            </>
+                                        ) : 'Submit Request'}
                                     </button>
                                 </div>
                             </>
