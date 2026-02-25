@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Phone, User, LogOut, Settings, CalendarDays } from 'lucide-react';
+import { Phone, User, LogOut, Settings, CalendarDays, Wallet } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 export default function B2BHeader() {
@@ -79,6 +79,14 @@ export default function B2BHeader() {
                                     >
                                         <Settings className="w-4 h-4 text-gray-400 group-hover:text-[#1FA6DD]" />
                                         <span className="font-medium">Account Settings</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setDropdownOpen(false); router.push('/b2b-demo/wallet'); }}
+                                        className="w-full text-left px-5 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-[#1FA6DD] transition-colors flex items-center gap-3 group"
+                                    >
+                                        <Wallet className="w-4 h-4 text-gray-400 group-hover:text-[#1FA6DD]" />
+                                        <span className="font-medium">Manage Wallet</span>
                                     </button>
 
                                     <div className="mx-4 border-t border-gray-100 my-1"></div>
