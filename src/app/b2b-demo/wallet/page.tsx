@@ -1,284 +1,302 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Briefcase, ChevronDown, Download, Filter, Plus, Search, Shield, Wallet, X } from 'lucide-react';
+import { ArrowLeft, Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft, Filter, Download, X, Shield, IndianRupee } from 'lucide-react';
+import B2BHeader from '../components/B2BHeader';
+import { useState } from 'react';
 
-export default function AgentWallet() {
+export default function WalletDashboard() {
     const router = useRouter();
     const [showTopUpModal, setShowTopUpModal] = useState(false);
-    const [amount, setAmount] = useState('5000');
+    const [topUpAmount, setTopUpAmount] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const [balance, setBalance] = useState(12500);
+    const [walletBalance, setWalletBalance] = useState(24500);
 
-    // Mock ledger data based on the PRD specification
-    const transactions = [
-        { id: 'TXN-098271', date: '24 Feb, 2026', type: 'DEBIT', amount: 3200, balance: 12500, desc: 'Booking PNR-88219 (25% Advance)' },
-        { id: 'TXN-098270', date: '22 Feb, 2026', type: 'CREDIT', amount: 10000, balance: 15700, desc: 'Wallet Top-Up via Razorpay' },
-        { id: 'TXN-098269', date: '18 Feb, 2026', type: 'DEBIT', amount: 8400, balance: 5700, desc: 'Booking PNR-88102 (Full Settlement)' },
-        { id: 'TXN-098268', date: '15 Feb, 2026', type: 'CREDIT', amount: 450, balance: 14100, desc: 'Refund for Toll adjustment PNR-87999' },
-        { id: 'TXN-098267', date: '10 Feb, 2026', type: 'DEBIT', amount: 2000, balance: 13650, desc: 'Booking PNR-87820 (25% Advance)' },
-    ];
+    // Dummy transaction history reflecting the PRD requirements
+    const [transactions, setTransactions] = useState([
+        { id: 'TXN-902183', date: '25 Feb 2026', time: '11:30 AM', type: 'Credit', category: 'Top-Up', ref: 'razorpay_pay_M...', amount: 50000, balance: 74500, status: 'Success' },
+        { id: 'TXN-882190', date: '24 Feb 2026', time: '09:15 AM', type: 'Debit', category: 'Booking', ref: 'SBN-8821', amount: 2500, balance: 24500, status: 'Success' },
+        { id: 'TXN-865012', date: '20 Feb 2026', time: '14:20 PM', type: 'Debit', category: 'Booking', ref: 'SBN-8650', amount: 6000, balance: 27000, status: 'Success' },
+        { id: 'TXN-865099', date: '18 Feb 2026', time: '10:00 AM', type: 'Credit', category: 'Refund', ref: 'SBN-8100', amount: 1500, balance: 33000, status: 'Success' },
+        { id: 'TXN-812345', date: '10 Feb 2026', time: '16:45 PM', type: 'Credit', category: 'Top-Up', ref: 'razorpay_pay_N...', amount: 20000, balance: 31500, status: 'Success' },
+    ]);
 
     const handleTopUp = () => {
         setIsProcessing(true);
-        // Simulate Razorpay loading
+        // Simulate Razorpay Gateway & Backend Logic
         setTimeout(() => {
             setIsProcessing(false);
             setIsSuccess(true);
-            setBalance(balance + parseInt(amount));
+            const newBalance = walletBalance + Number(topUpAmount);
+            setWalletBalance(newBalance);
 
-            // Auto close success modal
+            // Add new transaction to history
+            const newTxn = {
+                id: `TXN-${Math.floor(Math.random() * 900000) + 100000}`,
+                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                type: 'Credit',
+                category: 'Top-Up',
+                ref: `razorpay_pay_${Math.random().toString(36).substring(7).toUpperCase()}`,
+                amount: Number(topUpAmount),
+                balance: newBalance,
+                status: 'Success'
+            };
+
+            setTransactions([newTxn, ...transactions]);
+
             setTimeout(() => {
-                setIsSuccess(false);
                 setShowTopUpModal(false);
-                setAmount('5000');
+                setIsSuccess(false);
+                setTopUpAmount('');
             }, 2000);
         }, 1500);
     };
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-            {/* B2B Authenticated Header */}
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#2563EB] rounded-lg flex items-center justify-center cursor-pointer" onClick={() => router.push('/b2b-demo/dashboard')}>
-                            <Briefcase className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <span className="text-2xl font-bold text-gray-900 tracking-tight block leading-none pt-1">Savaari</span>
-                            <span className="text-xs font-bold text-[#2563EB] uppercase tracking-widest">B2B Agent Portal</span>
-                        </div>
+            <B2BHeader />
+
+            {/* Breadcrumb Row */}
+            <div className="bg-[#F2F2F2] border-b border-gray-200 py-2">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="text-[10px] text-gray-500 flex gap-1 items-center">
+                        <span className="hover:underline cursor-pointer" onClick={() => router.push('/b2b-demo/dashboard')}>Home</span>
+                        <span>&gt;</span>
+                        <span className="text-gray-800 font-medium">Wallet</span>
                     </div>
-
-                    <nav className="hidden md:flex items-center gap-8">
-                        <a href="#" onClick={(e) => { e.preventDefault(); router.push('/b2b-demo/dashboard'); }} className="text-sm font-semibold text-gray-500 hover:text-gray-900 py-7 transition-colors">Explore Cabs</a>
-                        <a href="#" className="text-sm font-semibold text-gray-500 hover:text-gray-900 py-7 transition-colors">My Bookings</a>
-                        <a href="#" className="text-sm font-bold text-[#2563EB] border-b-2 border-[#2563EB] py-7">Wallet</a>
-                    </nav>
-
-                    <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-bold border border-gray-200">
-                            DT
-                        </div>
-                        <div className="hidden lg:block">
-                            <span className="block text-sm font-bold text-gray-900">Doe Travels</span>
-                            <span className="block text-xs text-gray-500 font-medium">Agent ID: SVA-8921</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Main Content */}
-            <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
-
-                {/* Left Column: Wallet Status (Sticky on Desktop) */}
-                <div className="w-full md:w-80 flex-shrink-0">
-                    <div className="bg-white rounded-3xl p-6 shadow-xl shadow-gray-200/40 border border-gray-100 flex flex-col h-full md:sticky md:top-28">
-
-                        <div className="flex items-center gap-2 mb-6">
-                            <Wallet className="w-5 h-5 text-[#2563EB]" />
-                            <h2 className="text-base font-bold text-gray-900 uppercase tracking-wide">Wallet Hub</h2>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-gray-900 to-[#0F172A] rounded-2xl p-6 text-white mb-6 relative overflow-hidden shadow-lg shadow-gray-900/20">
-                            {/* Decorative arcs */}
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
-                            <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/20 rounded-full blur-xl transform -translate-x-10 translate-y-10"></div>
-
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Available Balance</span>
-                                    <span className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-bold uppercase rounded border border-green-500/30">Active</span>
-                                </div>
-                                <h3 className="text-4xl font-bold tracking-tight mb-1">
-                                    ₹ {balance.toLocaleString('en-IN')}<span className="text-lg text-gray-400 font-medium">.00</span>
-                                </h3>
-                                <p className="text-xs text-blue-300 mt-4 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" /> Secured by Razorpay</p>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => setShowTopUpModal(true)}
-                            className="w-full py-4 bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white font-bold rounded-xl hover:shadow-lg hover:shadow-orange-500/25 transition-all flex items-center justify-center gap-2 mt-auto"
-                        >
-                            <Plus className="w-5 h-5" /> Top-Up Wallet
+                    <div className="flex items-center gap-3 mt-2 mb-1">
+                        <button onClick={() => router.push('/b2b-demo/dashboard')} className="p-1 hover:bg-gray-300 rounded-full transition-colors -ml-1">
+                            <ArrowLeft className="w-4 h-4 text-gray-700" />
                         </button>
-                        <p className="text-xs text-center text-gray-400 mt-3">Instant credit via UPI/NetBanking</p>
-
+                        <h1 className="text-gray-800 text-lg font-bold">Agent Wallet</h1>
                     </div>
                 </div>
+            </div>
 
-                {/* Right Column: Ledger */}
-                <div className="flex-1 bg-white rounded-3xl shadow-xl shadow-gray-200/40 border border-gray-100 overflow-hidden flex flex-col">
+            <main className="max-w-7xl mx-auto px-4 w-full py-8 space-y-8">
 
-                    {/* Ledger Header & Filters */}
-                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <h2 className="text-xl font-bold text-gray-900">Transaction History</h2>
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <div className="relative flex-1 sm:flex-none">
-                                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                                <input type="text" placeholder="Search TXN ID..." className="w-full sm:w-48 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#2563EB]" />
+                {/* Balance & Actions Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Primary Balance Card */}
+                    <div className="col-span-1 md:col-span-2 bg-gradient-to-br from-[#1FA6DD] to-[#1578A3] rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+                        {/* Decorative background circle */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl"></div>
+                        <div className="absolute bottom-0 left-0 w-40 h-40 bg-black opacity-10 rounded-full translate-y-1/3 -translate-x-1/4"></div>
+
+                        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 h-full">
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Wallet className="w-5 h-5 text-blue-100" />
+                                    <h2 className="text-blue-100 font-medium text-sm tracking-wide uppercase">Available Balance</h2>
+                                </div>
+                                <div className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+                                    <span className="text-2xl font-semibold mr-1">₹</span>{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </div>
+                                <div className="flex items-center gap-2 mt-4">
+                                    <span className="px-2 py-1 bg-green-500/20 text-green-100 text-[10px] font-bold uppercase rounded border border-green-400/30">Active</span>
+                                    <p className="text-xs text-blue-100 flex items-center gap-1">
+                                        <Shield className="w-3 h-3" /> Ready for bookings
+                                    </p>
+                                </div>
                             </div>
-                            <button className="p-2 border border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-lg flex items-center justify-center transition-colors">
-                                <Filter className="w-4 h-4" />
-                            </button>
-                            <button className="p-2 border border-gray-200 text-[#2563EB] bg-blue-50 flex items-center gap-2 text-sm font-semibold rounded-lg hover:bg-blue-100 transition-colors">
-                                <Download className="w-4 h-4" /> Export
+
+                            <button
+                                onClick={() => setShowTopUpModal(true)}
+                                className="bg-white text-[#1FA6DD] hover:bg-gray-50 px-8 py-4 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 flex items-center justify-center gap-2 whitespace-nowrap"
+                            >
+                                <PlusCircle className="w-5 h-5" />
+                                Add Funds
                             </button>
                         </div>
                     </div>
 
-                    {/* Ledger Table */}
-                    <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/80 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-semibold">
-                                    <th className="p-4 pl-6 font-semibold">Date & ID</th>
-                                    <th className="p-4 font-semibold">Description</th>
-                                    <th className="p-4 font-semibold text-right">Debit</th>
-                                    <th className="p-4 font-semibold text-right">Credit</th>
-                                    <th className="p-4 pr-6 font-semibold text-right text-gray-400">Balance</th>
+                    {/* Quick Stats Card */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 flex flex-col justify-center">
+                        <h3 className="text-sm font-bold text-gray-800 mb-5 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <IndianRupee className="w-4 h-4 text-gray-400" />
+                            Account Limits
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center pb-3 border-b border-gray-50">
+                                <span className="text-xs font-semibold text-gray-500 uppercase">Credit Limit</span>
+                                <span className="font-bold text-gray-800">₹ 0.00</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-3 border-b border-gray-50">
+                                <span className="text-xs font-semibold text-gray-500 uppercase">Bank Info</span>
+                                <span className="text-sm font-medium text-gray-800 text-right">
+                                    HDFC Bank<br /><span className="text-xs text-gray-500">...3456</span>
+                                </span>
+                            </div>
+                            <div className="pt-2">
+                                <p className="text-[10px] text-gray-400 leading-tight">Minimum 25% wallet balance required to use 'Agent + Wallet' checkout option.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Transaction History Ledger */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-lg font-bold text-gray-800">Transaction Ledger</h2>
+                        <div className="flex items-center gap-3">
+                            <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
+                                <Filter className="w-4 h-4" />
+                                Filter Date
+                            </button>
+                            <button className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-[#1FA6DD] bg-blue-50 border border-[#1FA6DD]/20 rounded-lg hover:bg-blue-100 transition-colors">
+                                <Download className="w-4 h-4" />
+                                Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-[#F9F9F9] text-gray-500 uppercase text-[10px] font-bold tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-4 rounded-tl-lg">Date & TXN ID</th>
+                                    <th className="px-6 py-4">Ref / Category</th>
+                                    <th className="px-6 py-4 text-right">Debit</th>
+                                    <th className="px-6 py-4 text-right">Credit</th>
+                                    <th className="px-6 py-4 text-right">Balance</th>
                                 </tr>
                             </thead>
-                            <tbody className="text-sm">
-                                {transactions.map((txn, i) => (
-                                    <tr key={txn.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                        <td className="p-4 pl-6 align-top">
-                                            <div className="font-semibold text-gray-900">{txn.date}</div>
-                                            <div className="text-xs text-gray-400 mt-0.5">{txn.id}</div>
+                            <tbody className="divide-y divide-gray-100">
+                                {transactions.map((txn, index) => (
+                                    <tr key={index} className="hover:bg-blue-50/50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold text-gray-800 group-hover:text-[#1FA6DD] transition-colors">{txn.id}</span>
+                                                <span className="text-xs text-gray-500">{txn.date} • {txn.time}</span>
+                                            </div>
                                         </td>
-                                        <td className="p-4 align-top w-1/2">
-                                            <div className="text-gray-700 font-medium">{txn.desc}</div>
-                                            <div className="text-xs text-[#2563EB] font-medium mt-1 cursor-pointer hover:underline">View Invoice</div>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col items-start gap-1">
+                                                <span className="text-gray-700 font-medium">{txn.ref}</span>
+                                                <div className="flex items-center gap-1">
+                                                    {txn.type === 'Credit' ? (
+                                                        <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-0.5 rounded text-[10px] uppercase font-bold border border-green-100">
+                                                            <ArrowDownLeft className="w-3 h-3" />
+                                                            {txn.category}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1 text-orange-700 bg-orange-50 px-2 py-0.5 rounded text-[10px] uppercase font-bold border border-orange-100">
+                                                            <ArrowUpRight className="w-3 h-3" />
+                                                            {txn.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="p-4 align-top text-right font-semibold text-gray-900">
-                                            {txn.type === 'DEBIT' ? `₹ ${txn.amount.toLocaleString('en-IN')}` : '-'}
+                                        <td className="px-6 py-4 text-right font-medium text-gray-800">
+                                            {txn.type === 'Debit' ? `- ₹${txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
                                         </td>
-                                        <td className="p-4 align-top text-right font-bold text-green-600">
-                                            {txn.type === 'CREDIT' ? `+ ₹ ${txn.amount.toLocaleString('en-IN')}` : '-'}
+                                        <td className="px-6 py-4 text-right font-bold text-green-600">
+                                            {txn.type === 'Credit' ? `+ ₹${txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
                                         </td>
-                                        <td className="p-4 pr-6 align-top text-right text-gray-400 font-medium">
-                                            ₹ {txn.balance.toLocaleString('en-IN')}
+                                        <td className="px-6 py-4 text-right text-gray-600 font-semibold">
+                                            ₹{txn.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-
-                    {/* Pagination */}
-                    <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-                        <span>Showing 1-5 of 142 transactions</span>
-                        <div className="flex gap-2">
-                            <button className="px-3 py-1 border border-gray-200 rounded text-gray-400 cursor-not-allowed">Prevent</button>
-                            <button className="px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 text-gray-700 font-medium">Next</button>
-                        </div>
-                    </div>
-
                 </div>
+
             </main>
 
-            {/* TopUp Simulator Modal */}
-            <AnimatePresence>
-                {showTopUpModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden relative"
-                        >
-                            {!isProcessing && !isSuccess && (
-                                <button
-                                    onClick={() => setShowTopUpModal(false)}
-                                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            )}
+            {/* Top-Up Modal (Simulates Razorpay Flow) */}
+            {showTopUpModal && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
 
-                            {isSuccess ? (
-                                <div className="p-10 text-center">
-                                    <motion.div
-                                        initial={{ scale: 0 }} animate={{ scale: 1 }}
-                                        className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"
-                                    >
-                                        <Shield className="w-10 h-10 text-green-500" />
-                                    </motion.div>
-                                    <h3 className="text-2xl font-bold text-gray-900 mb-1">Payment Successful!</h3>
-                                    <p className="text-gray-500">₹ {parseInt(amount).toLocaleString('en-IN')} added to wallet.</p>
+                        {isSuccess ? (
+                            <div className="p-8 text-center bg-green-50">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                                    <Shield className="w-8 h-8 text-green-500" />
                                 </div>
-                            ) : isProcessing ? (
-                                <div className="p-10 text-center">
-                                    <div className="w-16 h-16 border-4 border-gray-100 border-t-[#2563EB] rounded-full animate-spin mx-auto mb-4"></div>
-                                    <h3 className="text-lg font-bold text-gray-900">Processing Payment...</h3>
-                                    <p className="text-gray-500 text-sm mt-1">Please do not close this window.</p>
+                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
+                                <p className="text-gray-600 font-medium">₹ {Number(topUpAmount).toLocaleString('en-IN')} has been added directly to your wallet.</p>
+                            </div>
+                        ) : isProcessing ? (
+                            <div className="p-10 text-center">
+                                <div className="w-16 h-16 border-4 border-gray-100 border-t-[#1FA6DD] rounded-full animate-spin mx-auto mb-4"></div>
+                                <h3 className="text-lg font-bold text-gray-900">Processing with Razorpay...</h3>
+                                <p className="text-gray-500 text-sm mt-2 font-medium">Please do not refresh or close this window.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50">
+                                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                        <Wallet className="w-5 h-5 text-[#1FA6DD]" />
+                                        Add Funds to Wallet
+                                    </h3>
+                                    <button onClick={() => setShowTopUpModal(false)} className="text-gray-400 hover:bg-gray-200 p-1.5 rounded-full transition-colors">
+                                        <X className="w-5 h-5" />
+                                    </button>
                                 </div>
-                            ) : (
-                                <div className="p-8">
-                                    <div className="flex items-center gap-2 mb-6 text-[#2563EB]">
-                                        <Wallet className="w-5 h-5" />
-                                        <h3 className="text-xl font-bold text-gray-900">Add Funds</h3>
-                                    </div>
 
-                                    <div className="space-y-6">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Enter Amount (₹)</label>
+                                <div className="p-6 space-y-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Enter Amount (₹)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <span className="text-gray-500 text-xl font-medium">₹</span>
+                                            </div>
                                             <input
                                                 type="number"
-                                                value={amount}
-                                                onChange={(e) => setAmount(e.target.value)}
-                                                className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-2xl font-bold text-gray-900 focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none transition-all"
+                                                placeholder="0.00"
+                                                className="w-full pl-9 pr-4 py-4 bg-white border border-gray-200 hover:border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-[#1FA6DD]/10 focus:border-[#1FA6DD] text-2xl font-bold text-gray-900 transition-all shadow-inner"
+                                                value={topUpAmount}
+                                                onChange={(e) => setTopUpAmount(e.target.value)}
+                                                autoFocus
                                             />
                                         </div>
-
-                                        <div className="flex gap-2">
-                                            {['2000', '5000', '10000'].map(val => (
+                                        <div className="flex gap-2 mt-4">
+                                            {['5000', '10000', '25000', '50000'].map((amt) => (
                                                 <button
-                                                    key={val}
-                                                    onClick={() => setAmount(val)}
-                                                    className={`flex-1 py-2 text-sm font-semibold rounded-lg border transition-colors ${amount === val ? 'bg-blue-50 border-[#2563EB] text-[#2563EB]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                    key={amt}
+                                                    onClick={() => setTopUpAmount(amt)}
+                                                    className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${topUpAmount === amt ? 'bg-blue-50 border-[#1FA6DD] text-[#1FA6DD]' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`}
                                                 >
-                                                    +₹ {val}
+                                                    +₹{Number(amt).toLocaleString('en-IN')}
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
 
-                                        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-gray-500">Amount</span>
-                                                <span className="font-semibold text-gray-900">₹ {amount || '0'}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm text-gray-500">
-                                                <span>Gateway Fee</span>
-                                                <span>₹ 0.00</span>
-                                            </div>
-                                            <div className="w-full h-px bg-gray-200 my-2"></div>
-                                            <div className="flex justify-between">
-                                                <span className="font-bold text-gray-900">Total Payable</span>
-                                                <span className="font-bold text-[#2563EB]">₹ {amount || '0'}</span>
-                                            </div>
+                                    <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 text-sm">
+                                        <Shield className="w-5 h-5 text-[#1FA6DD] flex-shrink-0 mt-0.5" />
+                                        <div className="text-gray-700">
+                                            <p className="font-bold text-gray-900 mb-1">Instant Settlement via Razorpay</p>
+                                            <p className="text-xs font-medium text-gray-600 leading-relaxed">Top-ups via UPI or NetBanking reflect immediately in your Active Balance.</p>
                                         </div>
-
-                                        <button
-                                            onClick={handleTopUp}
-                                            disabled={!amount || parseInt(amount) <= 0}
-                                            className="w-full py-4 bg-[#2563EB] text-white font-bold rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            Proceed to Pay
-                                        </button>
-                                        <p className="text-[10px] text-center text-gray-400 uppercase tracking-widest leading-relaxed">Secured by Razorpay • Instant Credit</p>
                                     </div>
                                 </div>
-                            )}
-                        </motion.div>
+
+                                <div className="p-5 border-t border-gray-100 flex gap-3 bg-gray-50">
+                                    <button
+                                        onClick={() => setShowTopUpModal(false)}
+                                        className="flex-1 py-3 text-sm font-bold text-gray-600 hover:bg-gray-200 bg-gray-100 border border-transparent rounded-xl transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleTopUp}
+                                        className={`flex-[2] py-3 text-sm font-bold text-white rounded-xl transition-all shadow-md ${topUpAmount && Number(topUpAmount) > 0 ? 'bg-[#1FA6DD] hover:bg-[#1889B6] hover:shadow-lg hover:-translate-y-0.5' : 'bg-gray-300 cursor-not-allowed shadow-none'}`}
+                                        disabled={!topUpAmount || Number(topUpAmount) <= 0}
+                                    >
+                                        Proceed to Pay
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
-                )}
-            </AnimatePresence>
+                </div>
+            )}
 
         </div>
     );
