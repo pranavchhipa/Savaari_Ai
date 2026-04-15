@@ -3,10 +3,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, ArrowRight, Sparkles } from 'lucide-react';
-import { Car, Location, TripStats, Stop } from '@/types';
+import { Car, Location, TripStats, Stop, Persona } from '@/types';
 import ScoutContainer from './ScoutContainer';
 import BillingFooter from './BillingFooter';
 import BookingModal from './BookingModal';
+import { PERSONAS } from './PersonaPicker';
 
 interface PlanningModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ interface PlanningModalProps {
     pickupDate?: string;
     dropDate?: string;
     pickupTime?: string;
+    persona?: Persona | null;
 }
 
 export default function PlanningModal({
@@ -30,6 +32,7 @@ export default function PlanningModal({
     pickupDate,
     dropDate,
     pickupTime,
+    persona,
 }: PlanningModalProps) {
     const [currentPrice, setCurrentPrice] = useState(car.baseFare);
     const [currentTripStats, setCurrentTripStats] = useState<TripStats | null>(null);
@@ -121,7 +124,7 @@ export default function PlanningModal({
                                         <h2 className="font-bold text-white text-lg">
                                             Customize your trip
                                         </h2>
-                                        <div className="flex items-center gap-2 text-sm text-blue-100">
+                                        <div className="flex items-center gap-2 text-sm text-blue-100 flex-wrap">
                                             <span>{car.name}</span>
                                             <span>•</span>
                                             <div className="flex items-center gap-1">
@@ -130,6 +133,22 @@ export default function PlanningModal({
                                                 <ArrowRight className="w-3 h-3" />
                                                 <span>{currentDestination.name}</span>
                                             </div>
+                                            {persona && (() => {
+                                                const meta = PERSONAS.find((p) => p.id === persona);
+                                                if (!meta) return null;
+                                                return (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span
+                                                            className="inline-flex items-center gap-1 bg-white/20 text-white px-2 py-0.5 rounded-full text-xs font-medium"
+                                                            title={meta.subtitle}
+                                                        >
+                                                            <span className="text-sm leading-none">{meta.emoji}</span>
+                                                            <span>{meta.name}</span>
+                                                        </span>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 </div>
@@ -155,6 +174,7 @@ export default function PlanningModal({
                                     onDestinationChange={handleDestinationChange}
                                     onTripStatsUpdate={handleTripStatsUpdate}
                                     isInModal={true}
+                                    persona={persona ?? null}
                                 />
                             </div>
 
