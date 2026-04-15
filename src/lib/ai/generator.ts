@@ -1,4 +1,4 @@
-'use server';
+// Server-only module (imports env vars + calls OpenRouter).
 
 import type { AICandidate, TravelContext } from '@/types';
 import { stageAPrompt } from './prompts';
