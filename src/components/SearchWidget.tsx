@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Location } from '@/types';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 
-type TripTab = 'one-way' | 'round-trip';
+type TripTab = 'one-way' | 'round-trip' | 'local';
 
 export default function SearchWidget() {
     const router = useRouter();
@@ -52,7 +52,12 @@ export default function SearchWidget() {
     };
 
     const handleSubmit = () => {
-        if (!source || !destination) {
+        if (tripTab === 'local') {
+            if (!source) {
+                alert('Please select a pickup location');
+                return;
+            }
+        } else {
             if (!source && !destination) {
                 alert('Please select pickup and drop locations');
                 return;
@@ -71,7 +76,7 @@ export default function SearchWidget() {
 
         const searchParams = {
             source,
-            destination,
+            destination: tripTab === 'local' ? null : destination,
             pickupDate,
             tripType: tripTab,
             dropDate: tripTab === 'round-trip' ? dropDate : undefined,
@@ -104,16 +109,16 @@ export default function SearchWidget() {
             {/* Compact Trip Type Toggle */}
             <div className="flex justify-center mb-0">
                 <div className="inline-flex bg-white rounded-t-2xl overflow-hidden border border-gray-200/60 border-b-0 shadow-sm">
-                    {(['one-way', 'round-trip'] as TripTab[]).map((tab) => (
+                    {(['one-way', 'round-trip', 'local'] as TripTab[]).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setTripTab(tab)}
-                            className={`relative px-8 py-3.5 text-sm font-semibold tracking-wide transition-all duration-300 ${tripTab === tab
+                            className={`relative px-6 md:px-8 py-3.5 text-sm font-semibold tracking-wide transition-all duration-300 ${tripTab === tab
                                     ? 'text-[#2563EB]'
                                     : 'text-gray-400 hover:text-gray-600'
                                 }`}
                         >
-                            {tab === 'one-way' ? 'One Way' : 'Round Trip'}
+                            {tab === 'one-way' ? 'One Way' : tab === 'round-trip' ? 'Round Trip' : 'Local'}
                             {tripTab === tab && (
                                 <motion.div
                                     layoutId="activeTab"
@@ -132,49 +137,62 @@ export default function SearchWidget() {
                 <div className="p-6 pb-0">
                     <div className="flex flex-col md:flex-row items-stretch gap-0 relative">
                         {/* FROM */}
-                        <div className="flex-1 min-w-0">
+                        <div className={tripTab === 'local' ? 'w-full min-w-0' : 'flex-1 min-w-0'}>
                             <GooglePlacesAutocomplete
-                                label="From"
-                                placeholder="Enter pickup city"
+                                label={tripTab === 'local' ? 'Pickup Address' : 'From'}
+                                placeholder={tripTab === 'local' ? 'Enter pickup city or address' : 'Enter pickup city'}
                                 defaultValue={sourceQuery}
                                 onPlaceSelect={handleSourceSelect}
                                 iconColor="#2563EB"
                             />
                         </div>
 
-                        {/* Swap Button - Desktop */}
-                        <div className="hidden md:flex items-end justify-center px-2 pb-2">
-                            <motion.button
-                                whileHover={{ scale: 1.1, rotate: 180 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={swapLocations}
-                                className="w-9 h-9 bg-gray-50 hover:bg-[#2563EB] hover:text-white rounded-full flex items-center justify-center text-gray-400 border border-gray-200 hover:border-[#2563EB] transition-all duration-300"
-                            >
-                                <ArrowLeftRight className="w-3.5 h-3.5" />
-                            </motion.button>
-                        </div>
+                        {/* Swap Button + TO (hidden for local) */}
+                        <AnimatePresence>
+                            {tripTab !== 'local' && (
+                                <motion.div
+                                    key="swap-and-to"
+                                    initial={{ opacity: 0, width: 0 }}
+                                    animate={{ opacity: 1, width: 'auto' }}
+                                    exit={{ opacity: 0, width: 0 }}
+                                    className="flex flex-col md:flex-row items-stretch gap-0 overflow-hidden flex-1 min-w-0"
+                                >
+                                    {/* Swap Button - Desktop */}
+                                    <div className="hidden md:flex items-end justify-center px-2 pb-2">
+                                        <motion.button
+                                            whileHover={{ scale: 1.1, rotate: 180 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={swapLocations}
+                                            className="w-9 h-9 bg-gray-50 hover:bg-[#2563EB] hover:text-white rounded-full flex items-center justify-center text-gray-400 border border-gray-200 hover:border-[#2563EB] transition-all duration-300"
+                                        >
+                                            <ArrowLeftRight className="w-3.5 h-3.5" />
+                                        </motion.button>
+                                    </div>
 
-                        {/* Mobile Swap */}
-                        <div className="md:hidden flex justify-center -my-1.5 relative z-10">
-                            <motion.button
-                                whileTap={{ rotate: 180 }}
-                                onClick={swapLocations}
-                                className="p-2 bg-white rounded-full shadow-md border border-gray-100 text-[#2563EB]"
-                            >
-                                <ArrowLeftRight className="w-3.5 h-3.5 rotate-90" />
-                            </motion.button>
-                        </div>
+                                    {/* Mobile Swap */}
+                                    <div className="md:hidden flex justify-center -my-1.5 relative z-10">
+                                        <motion.button
+                                            whileTap={{ rotate: 180 }}
+                                            onClick={swapLocations}
+                                            className="p-2 bg-white rounded-full shadow-md border border-gray-100 text-[#2563EB]"
+                                        >
+                                            <ArrowLeftRight className="w-3.5 h-3.5 rotate-90" />
+                                        </motion.button>
+                                    </div>
 
-                        {/* TO */}
-                        <div className="flex-1 min-w-0">
-                            <GooglePlacesAutocomplete
-                                label="To"
-                                placeholder="Enter destination city"
-                                defaultValue={destQuery}
-                                onPlaceSelect={handleDestSelect}
-                                iconColor="#F97316"
-                            />
-                        </div>
+                                    {/* TO */}
+                                    <div className="flex-1 min-w-0">
+                                        <GooglePlacesAutocomplete
+                                            label="To"
+                                            placeholder="Enter destination city"
+                                            defaultValue={destQuery}
+                                            onPlaceSelect={handleDestSelect}
+                                            iconColor="#F97316"
+                                        />
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
 
