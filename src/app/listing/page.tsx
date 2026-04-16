@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import CarCard from '@/components/CarCard';
-import { Car, SearchParams, Location } from '@/types';
+import { Car, SearchParams, Location, LocalPackage } from '@/types';
 import CarCardSkeleton from '@/components/CarCardSkeleton';
 
 import {
@@ -40,6 +40,8 @@ const sampleCars: Car[] = [
         perKmRate: 12,
         driverAllowancePerDay: 300,
         features: ['Fuel Included', 'Toll Included in Est.'],
+        localPackage8hr: 1800,
+        localPackage12hr: 2400,
     },
     {
         id: '2',
@@ -54,6 +56,8 @@ const sampleCars: Car[] = [
         perKmRate: 14,
         driverAllowancePerDay: 300,
         features: ['Comfortable Ride', 'Spacious Boot'],
+        localPackage8hr: 2200,
+        localPackage12hr: 2900,
     },
     {
         id: '3',
@@ -68,6 +72,8 @@ const sampleCars: Car[] = [
         perKmRate: 15,
         driverAllowancePerDay: 350,
         features: ['Premium Interior', 'Extra Legroom'],
+        localPackage8hr: 2400,
+        localPackage12hr: 3200,
     },
     {
         id: '4',
@@ -82,6 +88,8 @@ const sampleCars: Car[] = [
         perKmRate: 18,
         driverAllowancePerDay: 400,
         features: ['Great for Groups', '7 Seater'],
+        localPackage8hr: 3200,
+        localPackage12hr: 4200,
     },
     {
         id: '5',
@@ -96,6 +104,8 @@ const sampleCars: Car[] = [
         perKmRate: 22,
         driverAllowancePerDay: 500,
         features: ['Captain Seats', 'Luxury Comfort', 'Ample Luggage'],
+        localPackage8hr: 4500,
+        localPackage12hr: 5800,
     },
 ];
 
@@ -119,6 +129,7 @@ export default function ListingPage() {
     const [pickupDate, setPickupDate] = useState<string>('');
     const [dropDate, setDropDate] = useState<string>('');
     const [pickupTime, setPickupTime] = useState<string>('09:00');
+    const [localPackage, setLocalPackage] = useState<LocalPackage>('8hr_80km');
     const [filters, setFilters] = useState<FilterState>({
         carTypes: [],
         minSeats: 0,
@@ -181,6 +192,14 @@ export default function ListingPage() {
                 }
             }
 
+            // Skip route fetch for local trips — pricing is package-based
+            const stored = typeof window !== 'undefined' ? sessionStorage.getItem('savaari_search') : null;
+            const params = stored ? (() => { try { return JSON.parse(stored) as SearchParams; } catch { return null; } })() : null;
+            if (params?.tripType === 'local') {
+                setIsLoading(false);
+                return;
+            }
+
             console.log('[ListingPage] Loading route for:', currentSource.name, '->', currentDest.name);
 
             // EAGER CALCULATION: Set approximate distance immediately to show realistic prices
@@ -237,6 +256,19 @@ export default function ListingPage() {
             const currentRouteData = routeData;
             console.log('[ListingPage] Pricing Effect Triggered:', { currentRouteData, tripType });
 
+            // Local trips: price from package, no route needed
+            if (tripType === 'local') {
+                const updatedCars = sampleCars.map(car => {
+                    const packagePrice = localPackage === '8hr_80km'
+                        ? (car.localPackage8hr ?? car.perKmRate * 80)
+                        : (car.localPackage12hr ?? car.perKmRate * 120);
+                    return { ...car, baseFare: packagePrice };
+                });
+                console.log('[ListingPage] Local Package Cars:', updatedCars.map(c => c.baseFare));
+                setCars(updatedCars);
+                return;
+            }
+
             if (!currentRouteData) return;
 
             try {
@@ -265,7 +297,7 @@ export default function ListingPage() {
         };
 
         calculatePrices();
-    }, [routeData, tripType]);
+    }, [routeData, tripType, localPackage]);
 
 
 
@@ -352,35 +384,43 @@ export default function ListingPage() {
                                 <ChevronLeft className="w-5 h-5 text-gray-600" />
                             </button>
 
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 text-gray-800">
-                                    <div className="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
-                                        <MapPin className="w-4 h-4 text-white" />
-                                    </div>
-                                    <span className="font-semibold">{source.name}</span>
+                            {tripType === 'local' ? (
+                                <div className="flex items-center gap-2">
+                                    <MapPin className="w-5 h-5 text-[#2563EB]" />
+                                    <span className="text-lg font-bold text-gray-800">{source.name}</span>
+                                    <span className="text-sm font-medium text-gray-400">• Local</span>
                                 </div>
-
-                                <ArrowRight className="w-4 h-4 text-gray-400" />
-
-                                <div className="flex items-center gap-2 text-gray-800">
-                                    <div className="w-8 h-8 bg-[#F97316] rounded-lg flex items-center justify-center">
-                                        <MapPin className="w-4 h-4 text-white" />
-                                    </div>
-                                    <span className="font-semibold">{destination.name}</span>
-                                </div>
-
-                                {tripType === 'round-trip' && (
-                                    <>
-                                        <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <div className="flex items-center gap-2 text-gray-800">
-                                            <div className="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
-                                                <MapPin className="w-4 h-4 text-white" />
-                                            </div>
-                                            <span className="font-semibold">{source.name}</span>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 text-gray-800">
+                                        <div className="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
+                                            <MapPin className="w-4 h-4 text-white" />
                                         </div>
-                                    </>
-                                )}
-                            </div>
+                                        <span className="font-semibold">{source.name}</span>
+                                    </div>
+
+                                    <ArrowRight className="w-4 h-4 text-gray-400" />
+
+                                    <div className="flex items-center gap-2 text-gray-800">
+                                        <div className="w-8 h-8 bg-[#F97316] rounded-lg flex items-center justify-center">
+                                            <MapPin className="w-4 h-4 text-white" />
+                                        </div>
+                                        <span className="font-semibold">{destination.name}</span>
+                                    </div>
+
+                                    {tripType === 'round-trip' && (
+                                        <>
+                                            <ArrowRight className="w-4 h-4 text-gray-400" />
+                                            <div className="flex items-center gap-2 text-gray-800">
+                                                <div className="w-8 h-8 bg-[#2563EB] rounded-lg flex items-center justify-center">
+                                                    <MapPin className="w-4 h-4 text-white" />
+                                                </div>
+                                                <span className="font-semibold">{source.name}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Trip Details - Improved UI */}
@@ -459,6 +499,30 @@ export default function ListingPage() {
                                     <span className="hidden sm:inline">Round Trip</span>
                                 </button>
                             </div>
+
+                            {/* Package Toggle - visible only for local trips */}
+                            {tripType === 'local' && (
+                                <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                                    <button
+                                        onClick={() => setLocalPackage('8hr_80km')}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${localPackage === '8hr_80km'
+                                            ? 'bg-white text-[#2563EB] shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        8 hrs / 80 km
+                                    </button>
+                                    <button
+                                        onClick={() => setLocalPackage('12hr_120km')}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${localPackage === '12hr_120km'
+                                            ? 'bg-white text-[#2563EB] shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        12 hrs / 120 km
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -675,8 +739,8 @@ export default function ListingPage() {
                                 <CarCard
                                     car={car}
                                     source={source}
-                                    destination={destination}
-                                    tripType={tripType}
+                                    destination={tripType === 'local' ? source : destination}
+                                    tripType={tripType === 'local' ? 'one-way' : tripType}
                                     pickupDate={pickupDate}
                                     dropDate={dropDate}
                                     pickupTime={pickupTime}
