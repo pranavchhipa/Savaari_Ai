@@ -6,6 +6,34 @@ import { Stop } from '@/types';
 import { getStopTypeIcon, getStopTypeColor } from '@/lib/calculateTripStats';
 import { Moon, MapPin, ChevronDown, Info, Loader2, Sparkles, Camera, Clock } from 'lucide-react';
 
+function getPlaceholderGradient(type: string): string {
+    switch (type) {
+        case 'heritage': return 'bg-gradient-to-br from-amber-100 to-orange-200';
+        case 'nature':
+        case 'viewpoint': return 'bg-gradient-to-br from-emerald-100 to-green-200';
+        case 'food':
+        case 'restaurant': return 'bg-gradient-to-br from-red-100 to-orange-200';
+        case 'adventure': return 'bg-gradient-to-br from-blue-100 to-cyan-200';
+        case 'tourist':
+        case 'cultural': return 'bg-gradient-to-br from-purple-100 to-violet-200';
+        default: return 'bg-gradient-to-br from-gray-100 to-slate-200';
+    }
+}
+
+function getPlaceholderEmoji(type: string): string {
+    switch (type) {
+        case 'heritage': return '🏛️';
+        case 'nature':
+        case 'viewpoint': return '🌿';
+        case 'food':
+        case 'restaurant': return '🍛';
+        case 'adventure': return '🏔️';
+        case 'tourist':
+        case 'cultural': return '✨';
+        default: return '📍';
+    }
+}
+
 interface PlaceInfo {
     description: string;
     whyStopHere: string;
@@ -221,6 +249,27 @@ export default function TimelineItem({
                             <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                         </button>
                     </div>
+
+                    {/* Photo / Placeholder */}
+                    {!isStartOrEnd && (
+                        <div className="mt-2 rounded-lg overflow-hidden h-24 w-full relative">
+                            {stop.photoUrl ? (
+                                <motion.img
+                                    key={stop.photoUrl}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                    src={stop.photoUrl}
+                                    alt={stop.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className={`w-full h-full flex items-center justify-center text-2xl ${getPlaceholderGradient(stop.type)}`}>
+                                    {getPlaceholderEmoji(stop.type)}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Expandable Details with AI Info */}
                     <AnimatePresence>
