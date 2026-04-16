@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Location, Stop, RouteData, RouteOption, TripStats, AIRecommendation, AIRouteStopsResponse } from '@/types';
+import { Location, Stop, RouteData, RouteOption, TripStats, AIRecommendation, AIRouteStopsResponse, Persona, PaceLevel, BudgetLevel, AICandidate } from '@/types';
 import { calculateTripStats } from '@/lib/calculateTripStats';
 import { getCoordinateAtDistance, calculateArrivalTime, getMidpointForNightHalt } from '@/lib/routing';
 // import { searchLocations } from '@/lib/geocoding'; // Removed in favor of client-side geocoding
@@ -13,8 +13,8 @@ import { loadGoogleMapsScript } from '@/lib/maps';
 const clientAICache = new Map<string, { data: AIRouteStopsResponse; timestamp: number }>();
 const CLIENT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-function getClientCacheKey(source: string, dest: string): string {
-    return `${source.toLowerCase().trim()}-${dest.toLowerCase().trim()}`;
+function getClientCacheKey(source: string, dest: string, persona?: Persona | null): string {
+    return `${source.toLowerCase().trim()}-${dest.toLowerCase().trim()}-${persona ?? 'any'}`;
 }
 
 interface UseTripLogicProps {
@@ -27,6 +27,11 @@ interface UseTripLogicProps {
     pickupDate?: string;
     dropDate?: string;
     pickupTime?: string;
+    // Personalization v2
+    persona?: Persona | null;
+    pace?: PaceLevel;
+    budget?: BudgetLevel;
+    carType?: string;
 }
 
 interface UseTripLogicReturn {
@@ -58,6 +63,10 @@ export function useTripLogic({
     pickupDate,
     dropDate,
     pickupTime,
+    persona,
+    pace,
+    budget,
+    carType,
 }: UseTripLogicProps): UseTripLogicReturn {
     const [routeData, setRouteData] = useState<RouteData | null>(null);
     const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
@@ -75,6 +84,9 @@ export function useTripLogic({
         suggestedCity: string;
     } | null>(null);
     const [scoutTip, setScoutTip] = useState<string | null>(null);
+    // Personalization v2 — Stage A candidate pool for client-side re-rank
+    const [stageACandidates, setStageACandidates] = useState<AICandidate[]>([]);
+    const rerankAbortRef = useRef<AbortController | null>(null);
 
     // Initialize Google Maps Script
     useEffect(() => {
@@ -167,21 +179,31 @@ export function useTripLogic({
         return result;
     }, []);
 
-    // Fetch AI-generated stops (with client-side cache)
+    // Fetch AI-generated stops (with client-side cache).
+    // Cache key includes persona so switching persona refetches.
     const fetchAIStops = async (
         sourceName: string,
         destName: string,
-        distanceKm: number
+        distanceKm: number,
+        opts: {
+            carType?: string;
+            pickupDate?: string;
+            pickupTime?: string;
+            totalDays?: number;
+            persona?: Persona | null;
+            pace?: PaceLevel;
+            budget?: BudgetLevel;
+        } = {},
     ): Promise<AIRouteStopsResponse | null> => {
-        // Check client-side cache first
-        const cacheKey = getClientCacheKey(sourceName, destName);
+        // Check client-side cache first (per-persona)
+        const cacheKey = getClientCacheKey(sourceName, destName, opts.persona ?? null);
         const cached = clientAICache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CLIENT_CACHE_TTL) {
-            console.log(`[Sarathi] Client cache hit for ${sourceName} → ${destName}`);
+            console.log(`[Sarathi] Client cache hit for ${sourceName} → ${destName} (${opts.persona ?? 'any'})`);
             return cached.data;
         }
-        // Also check reverse direction
-        const reverseCacheKey = getClientCacheKey(destName, sourceName);
+        // Also check reverse direction (same persona)
+        const reverseCacheKey = getClientCacheKey(destName, sourceName, opts.persona ?? null);
         const reverseCached = clientAICache.get(reverseCacheKey);
         if (reverseCached && Date.now() - reverseCached.timestamp < CLIENT_CACHE_TTL) {
             console.log(`[Sarathi] Client cache hit (reverse) for ${sourceName} → ${destName}`);
@@ -196,6 +218,13 @@ export function useTripLogic({
                     source: sourceName,
                     destination: destName,
                     distanceKm,
+                    carType: opts.carType,
+                    pickupDate: opts.pickupDate,
+                    pickupTime: opts.pickupTime,
+                    totalDays: opts.totalDays,
+                    persona: opts.persona ?? null,
+                    pace: opts.pace ?? 'balanced',
+                    budget: opts.budget ?? 'standard',
                 }),
             });
 
@@ -204,7 +233,7 @@ export function useTripLogic({
 
             // Cache the response
             clientAICache.set(cacheKey, { data, timestamp: Date.now() });
-            console.log(`[Sarathi] Cached AI response for ${sourceName} → ${destName}`);
+            console.log(`[Sarathi] Cached AI response for ${sourceName} → ${destName} (${opts.persona ?? 'any'})`);
             return data;
         } catch (error) {
             console.error('Failed to fetch AI stops:', error);
@@ -379,14 +408,29 @@ export function useTripLogic({
             }]);
             setSelectedRouteId(route.selectedRouteId || 'route-0');
 
-            // Fetch AI recommendations for the route
+            // Fetch AI recommendations for the route (persona-aware)
             const distance = route.distanceKm;
-            const onwardResponse = await fetchAIStops(source.name, destination.name, distance);
+            const aiOpts = {
+                carType,
+                pickupDate,
+                pickupTime,
+                totalDays: (pickupDate && dropDate)
+                    ? Math.max(1, Math.ceil(
+                        (new Date(dropDate).getTime() - new Date(pickupDate).getTime()) / (1000 * 60 * 60 * 24),
+                    ))
+                    : 1,
+                persona: persona ?? null,
+                pace,
+                budget,
+            };
+            const onwardResponse = await fetchAIStops(source.name, destination.name, distance, aiOpts);
 
             // Store recommendations for the showcase component
             if (onwardResponse?.stops) {
                 setRecommendations(onwardResponse.stops);
                 setDontMiss(onwardResponse.dontMiss || []);
+                // Snapshot for client-side re-rank when sliders change
+                setStageACandidates(onwardResponse.stops as AICandidate[]);
             }
 
             let finalStops: Stop[] = [];
@@ -460,7 +504,7 @@ export function useTripLogic({
 
             // Handle round trip
             if (tripType === 'round-trip') {
-                const returnResponse = await fetchAIStops(destination.name, source.name, distance);
+                const returnResponse = await fetchAIStops(destination.name, source.name, distance, aiOpts);
 
                 if (returnResponse?.stops && returnResponse.stops.length > 0) {
                     const validatedReturn = await processAndValidateStops(
@@ -522,7 +566,7 @@ export function useTripLogic({
         } finally {
             setIsLoading(false);
         }
-    }, [source, destination, baseFare, perKmRate, driverAllowancePerDay, tripType, convertAIStopsToStops]);
+    }, [source, destination, baseFare, perKmRate, driverAllowancePerDay, tripType, convertAIStopsToStops, persona, pace, budget, carType, pickupDate, dropDate, pickupTime]);
 
     // Select a different route
     const selectRoute = useCallback((routeId: string) => {
@@ -737,6 +781,58 @@ export function useTripLogic({
     useEffect(() => {
         fetchRouteAndStops();
     }, [fetchRouteAndStops]);
+
+    // Client-side re-rank when the user drags pace/budget sliders.
+    // Debounced 400ms. Persona changes re-run the main fetch above (different cache key),
+    // so this effect only refines an already-generated candidate pool.
+    useEffect(() => {
+        if (!persona) return;
+        if (stageACandidates.length === 0) return;
+        if (!routeData || !source || !destination) return;
+
+        const handle = setTimeout(async () => {
+            rerankAbortRef.current?.abort();
+            const controller = new AbortController();
+            rerankAbortRef.current = controller;
+
+            try {
+                const res = await fetch('/api/ai/rerank', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        candidates: stageACandidates,
+                        persona,
+                        pace: pace ?? 'balanced',
+                        budget: budget ?? 'standard',
+                    }),
+                    signal: controller.signal,
+                });
+                if (!res.ok) return;
+                const json = (await res.json()) as { stops: AIRecommendation[] };
+                if (!Array.isArray(json.stops)) return;
+
+                setRecommendations(json.stops);
+                // Re-derive stops[] from new recommendations using existing converter.
+                const newStops = convertAIStopsToStops(
+                    json.stops,
+                    routeData.coordinates,
+                    source,
+                    destination,
+                    routeData.distanceKm,
+                    'onward',
+                );
+                setStops(newStops);
+                // Keep selected-stops set filtered to items still present
+                setSelectedStops((prev) => prev.filter((s) => s.type === 'start' || s.type === 'end' || newStops.some((n) => n.id === s.id)));
+            } catch (err) {
+                if ((err as Error).name !== 'AbortError') {
+                    console.error('[Sarathi] Rerank failed:', err);
+                }
+            }
+        }, 400);
+
+        return () => clearTimeout(handle);
+    }, [pace, budget, persona, stageACandidates, routeData, source, destination, convertAIStopsToStops]);
 
     return {
         routeData,

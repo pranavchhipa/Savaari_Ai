@@ -3,9 +3,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
-import { Car, Location, TripStats, Stop } from '@/types';
+import { Car, Location, TripStats, Stop, Persona } from '@/types';
 import PlanningModal from './PlanningModal';
 import BookingModal from './BookingModal';
+import PersonaPicker from './PersonaPicker';
+import { ENABLE_PERSONAS } from '@/lib/flags';
 import { formatCurrency } from '@/lib/calculateTripStats';
 import {
     Star,
@@ -30,6 +32,8 @@ interface CarCardProps {
 export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime }: CarCardProps) {
     const [showPlanningModal, setShowPlanningModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
+    const [showPersonaPicker, setShowPersonaPicker] = useState(false);
+    const [chosenPersona, setChosenPersona] = useState<Persona | null>(null);
     const [currentPrice, setCurrentPrice] = useState(car.baseFare);
 
     // Sync local price state with incoming prop updates
@@ -125,7 +129,13 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
 
                             {/* Plan My Perfect Trip CTA — positioned below features */}
                             <button
-                                onClick={() => setShowPlanningModal(true)}
+                                onClick={() => {
+                                    if (ENABLE_PERSONAS) {
+                                        setShowPersonaPicker(true);
+                                    } else {
+                                        setShowPlanningModal(true);
+                                    }
+                                }}
                                 className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 text-[#2563EB] border border-blue-200/60 hover:from-blue-100 hover:via-indigo-100 hover:to-purple-100 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100/50 transition-all duration-300 group"
                             >
                                 <Sparkles className="w-4 h-4 text-indigo-500 group-hover:animate-pulse" />
@@ -160,10 +170,27 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                 </div>
             </motion.div>
 
+            {/* Persona Picker — gates the Planning Modal when personas are enabled */}
+            <PersonaPicker
+                isOpen={showPersonaPicker}
+                onClose={() => setShowPersonaPicker(false)}
+                onSelect={(persona) => {
+                    setChosenPersona(persona);
+                    setShowPersonaPicker(false);
+                    setShowPlanningModal(true);
+                }}
+                source={source.name}
+                destination={destination.name}
+            />
+
             {/* Planning Modal */}
             <PlanningModal
                 isOpen={showPlanningModal}
-                onClose={() => setShowPlanningModal(false)}
+                onClose={() => {
+                    setShowPlanningModal(false);
+                    // Reset persona on close so next plan starts fresh
+                    setChosenPersona(null);
+                }}
                 car={car}
                 source={source}
                 destination={destination}
@@ -171,6 +198,7 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                 pickupDate={pickupDate}
                 dropDate={dropDate}
                 pickupTime={pickupTime}
+                persona={chosenPersona}
             />
 
             {/* Direct Booking Modal (without customization) */}
