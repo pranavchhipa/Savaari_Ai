@@ -20,7 +20,7 @@ function getClientCacheKey(source: string, dest: string, persona?: Persona | nul
 interface UseTripLogicProps {
     source: Location | null;
     destination: Location | null;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     baseFare: number;
     perKmRate: number;
     driverAllowancePerDay: number;

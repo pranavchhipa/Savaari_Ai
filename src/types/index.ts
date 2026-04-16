@@ -40,6 +40,7 @@ export interface Stop {
   famousFor?: string;
   bestTimeToVisit?: string;
   imageQuery?: string;       // For generating placeholder images
+  photoUrl?: string;          // Google Places photo or lazy-loaded
 }
 
 export interface TripDay {
@@ -85,6 +86,8 @@ export interface Car {
   perKmRate: number;
   driverAllowancePerDay: number;
   features: string[];
+  localPackage8hr?: number;   // base price for 8hr/80km
+  localPackage12hr?: number;  // base price for 12hr/120km
 }
 
 export interface RoutePoint {
@@ -129,8 +132,11 @@ export interface SearchParams {
   pickupDate: string;
   dropDate?: string;
   pickupTime?: string;
-  tripType: 'one-way' | 'round-trip';
+  tripType: 'one-way' | 'round-trip' | 'local';
+  localPackage?: LocalPackage;
 }
+
+export type LocalPackage = '8hr_80km' | '12hr_120km';
 
 export interface NominatimResult {
   place_id: number;
@@ -208,6 +214,9 @@ export interface TravelContext {
   pickupDate: string;        // YYYY-MM-DD
   pickupTime: string;        // HH:MM
   totalDays: number;         // from trip type + dates
+  isLocal?: boolean;
+  localPackage?: LocalPackage;
+  radiusKm?: number;          // for local: 80 or 120
 }
 
 // Stage A output: broader than AIRecommendation, with persona-hint tags.

@@ -30,7 +30,7 @@ interface ScoutContainerProps {
     source: Location;
     destination: Location;
     car: Car;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     onPriceUpdate: (newPrice: number) => void;
     pickupDate?: string;
     dropDate?: string;

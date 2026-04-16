@@ -29,7 +29,7 @@ interface BookingModalProps {
     source: Location;
     destination: Location;
     car: Car;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     tripStats: TripStats;
     selectedStops: Stop[];
     pickupDate: string;

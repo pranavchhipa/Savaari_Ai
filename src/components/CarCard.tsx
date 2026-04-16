@@ -23,7 +23,7 @@ interface CarCardProps {
     car: Car;
     source: Location;
     destination: Location;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     pickupDate?: string;
     dropDate?: string;
     pickupTime?: string;

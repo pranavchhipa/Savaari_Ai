@@ -115,7 +115,7 @@ export default function ListingPage() {
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
-    const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('round-trip');
+    const [tripType, setTripType] = useState<'one-way' | 'round-trip' | 'local'>('round-trip');
     const [pickupDate, setPickupDate] = useState<string>('');
     const [dropDate, setDropDate] = useState<string>('');
     const [pickupTime, setPickupTime] = useState<string>('09:00');
