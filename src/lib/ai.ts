@@ -1,4 +1,6 @@
-'use server';
+// Server-only module: OpenRouter calls + env vars. Called from API routes,
+// not from client components directly, so 'use server' is unnecessary (and
+// would force every export to be async).
 
 import { AIRouteStopsResponse, AIRecommendation, StopBadge } from '@/types';
 import { getHotRouteData } from './hotRoutes';
@@ -444,6 +446,93 @@ function generateIntelligentFallback(
         fallback: true,
     };
 }
+
+/**
+ * Exported for src/lib/ai/fallback.ts. Returns the legacy per-route tourist
+ * data that we now reuse as the candidate pool when AI is unavailable.
+ * Returns null when no curated data exists for the route.
+ */
+export function getLegacyRouteFallback(
+    source: string,
+    destination: string,
+    distanceKm: number,
+): AIRouteStopsResponse | null {
+    const result = generateIntelligentFallback(source, destination, distanceKm);
+    return result.stops.length > 0 ? result : null;
+}
+
+// =============================================================================
+// Two-stage entry point (v2)
+// =============================================================================
+
+import type { TravelContext, Persona, PaceLevel, BudgetLevel } from '@/types';
+import { generateCandidates } from './ai/generator';
+import { rerankStops, clientSideRerank } from './ai/reranker';
+import { fallbackRerankedStops } from './ai/fallback';
+
+/**
+ * v2 entry point used by /api/ai/generate-stops when ENABLE_PERSONAS is true.
+ * - If persona is null, returns Stage A candidates only (for legacy display).
+ * - If persona is provided, runs both Stage A and Stage B.
+ */
+export async function generateStopsForContext(params: {
+    ctx: TravelContext;
+    persona: Persona | null;
+    pace: PaceLevel;
+    budget: BudgetLevel;
+}): Promise<AIRouteStopsResponse> {
+    const { ctx, persona, pace, budget } = params;
+
+    const candidates = await generateCandidates(ctx);
+
+    if (!candidates || candidates.length === 0) {
+        // Full fallback path — AI unavailable or no candidates.
+        if (persona) {
+            const fb = fallbackRerankedStops(
+                ctx.source,
+                ctx.destination,
+                ctx.distanceKm,
+                persona,
+                pace,
+                budget,
+            );
+            return {
+                stops: fb.stops,
+                dontMiss: fb.stops.slice(0, 3),
+                fallback: true,
+                nightHalt: ctx.distanceKm > 400
+                    ? { city: 'Midpoint City', reason: 'Rest for a fresh start', approximateKm: Math.round(ctx.distanceKm * 0.45) }
+                    : undefined,
+            };
+        }
+        const legacy = getLegacyRouteFallback(ctx.source, ctx.destination, ctx.distanceKm);
+        return legacy ?? { stops: [], dontMiss: [], fallback: true };
+    }
+
+    // We have Stage A candidates.
+    if (!persona) {
+        // No persona yet — return a trimmed candidate set.
+        return {
+            stops: candidates.slice(0, 7),
+            dontMiss: candidates.slice(0, 3),
+            nightHalt: ctx.distanceKm > 400
+                ? { city: 'Midpoint City', reason: 'Rest for a fresh start', approximateKm: Math.round(ctx.distanceKm * 0.45) }
+                : undefined,
+        };
+    }
+
+    const reranked = await rerankStops({ ctx, persona, pace, budget, candidates });
+    return {
+        stops: reranked,
+        dontMiss: reranked.slice(0, 3),
+        nightHalt: ctx.distanceKm > 400
+            ? { city: 'Midpoint City', reason: 'Rest for a fresh start', approximateKm: Math.round(ctx.distanceKm * 0.45) }
+            : undefined,
+    };
+}
+
+// Re-export heuristic rerank for the /api/ai/rerank route.
+export { clientSideRerank };
 
 /**
  * Get place information for a specific location

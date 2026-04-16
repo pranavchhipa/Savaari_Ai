@@ -185,3 +185,51 @@ export interface AIRouteStopsResponse {
   fallback?: boolean;
   error?: string;
 }
+
+// ===== Personalization v2 =====
+
+export type Persona = 'family' | 'couple' | 'friends' | 'solo' | 'business';
+export type PaceLevel = 'relaxed' | 'balanced' | 'packed';
+export type BudgetLevel = 'budget' | 'standard' | 'premium';
+
+export interface PersonaMeta {
+  id: Persona;
+  name: string;              // "Family Weekend"
+  subtitle: string;          // "Safe stops the kids will love"
+  emoji: string;             // "👨‍👩‍👧"
+  vibeChips: string[];       // ["Kid-safe", "Heritage", "Nature"]
+}
+
+export interface TravelContext {
+  source: string;
+  destination: string;
+  distanceKm: number;
+  carType: string;           // e.g. "Hatchback", "SUV", "MUV"
+  pickupDate: string;        // YYYY-MM-DD
+  pickupTime: string;        // HH:MM
+  totalDays: number;         // from trip type + dates
+}
+
+// Stage A output: broader than AIRecommendation, with persona-hint tags.
+export type CandidateTag =
+  | 'kid-safe'
+  | 'scenic'
+  | 'romantic'
+  | 'adventure'
+  | 'offbeat'
+  | 'cultural-depth'
+  | 'quick-stop'
+  | 'paid-entry'
+  | 'free'
+  | 'photo-op';
+
+export interface AICandidate extends AIRecommendation {
+  tags?: CandidateTag[];
+  entryFeeInr?: number;      // 0 for free
+}
+
+// Stage B output: subset of AICandidate with persona fit added.
+export interface RerankedStop extends AICandidate {
+  personaRelevance: number;  // 0-1
+  personaReason?: string;    // "Kid-safe open gardens with clean restrooms"
+}

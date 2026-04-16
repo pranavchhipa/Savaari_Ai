@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Location, Car, Stop, JourneySegment, TripStats } from '@/types';
+import { Location, Car, Stop, JourneySegment, TripStats, Persona, PaceLevel, BudgetLevel } from '@/types';
 import { useTripLogic } from '@/hooks/useTripLogic';
 import Timeline from './Timeline';
 import ScoutTip from './ScoutTip';
@@ -12,6 +12,7 @@ import JourneyDayCard from './JourneyDayCard';
 import DestinationChanger from './DestinationChanger';
 import RouteSelector from './RouteSelector';
 import RecommendationShowcase from './RecommendationShowcase';
+import RefinementBar from './RefinementBar';
 import { formatCurrency, formatDuration, formatDistance } from '@/lib/calculateTripStats';
 import { MapPin, Clock, Calendar, IndianRupee, Loader2, Route, Sparkles } from 'lucide-react';
 
@@ -37,6 +38,7 @@ interface ScoutContainerProps {
     onDestinationChange?: (newDestination: Location) => void;
     onTripStatsUpdate?: (tripStats: TripStats, selectedStops: Stop[]) => void;
     isInModal?: boolean;
+    persona?: Persona | null;
 }
 
 export default function ScoutContainer({
@@ -51,11 +53,15 @@ export default function ScoutContainer({
     onDestinationChange,
     onTripStatsUpdate,
     isInModal = false,
+    persona = null,
 }: ScoutContainerProps) {
     const [focusedStopId, setFocusedStopId] = useState<string | undefined>();
     const [showDestinationChanger, setShowDestinationChanger] = useState(false);
     const [viewMode, setViewMode] = useState<'timeline' | 'daywise'>('daywise');
     const [currentDestination, setCurrentDestination] = useState(destination);
+    // Personalization v2 — slider state (persisted across persona within same session)
+    const [pace, setPace] = useState<PaceLevel>('balanced');
+    const [budget, setBudget] = useState<BudgetLevel>('standard');
 
     const {
         routeData,
@@ -84,6 +90,10 @@ export default function ScoutContainer({
         pickupDate,
         dropDate,
         pickupTime,
+        persona,
+        pace,
+        budget,
+        carType: car.type,
     });
 
     // Update parent with new price when tripStats changes
@@ -314,6 +324,20 @@ export default function ScoutContainer({
                     perKmRate={car.perKmRate}
                     driverAllowancePerDay={car.driverAllowancePerDay}
                 />
+            )}
+
+            {/* Refinement Bar — only shows when a persona is active */}
+            {persona && (
+                <div className="px-4 pt-4">
+                    <RefinementBar
+                        pace={pace}
+                        budget={budget}
+                        onPaceChange={setPace}
+                        onBudgetChange={setBudget}
+                        isBusy={isLoading}
+                        stopCount={recommendations.length}
+                    />
+                </div>
             )}
 
             {/* AI Recommendation Showcase */}
