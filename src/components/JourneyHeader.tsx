@@ -20,7 +20,7 @@ interface JourneyHeaderProps {
     pickupDate: string;
     dropDate?: string;
     pickupTime?: string;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     totalDays: number;
     totalDistanceKm: number;
     totalDriveTimeHours: number;

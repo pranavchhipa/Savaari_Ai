@@ -17,7 +17,7 @@ interface CalculateTripStatsParams {
     baseFare: number;
     perKmRate: number;
     driverAllowancePerDay: number;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     tollEstimate?: number;
     routeLabel?: string;
 }

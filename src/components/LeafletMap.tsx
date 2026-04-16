@@ -11,7 +11,7 @@ interface LeafletMapProps {
     stops: Stop[];
     selectedStopId?: string;
     onStopClick?: (stopId: string) => void;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
 }
 
 export default function LeafletMap({

@@ -7,6 +7,7 @@ import { getCoordinateAtDistance, calculateArrivalTime, getMidpointForNightHalt 
 // import { searchLocations } from '@/lib/geocoding'; // Removed in favor of client-side geocoding
 import { isPointInBoundingBox, getRouteMetrics } from '@/lib/geoUtils';
 import { loadGoogleMapsScript } from '@/lib/maps';
+import { useLazyPlacePhotos } from './useLazyPlacePhotos';
 
 // Module-level client-side cache for AI responses
 // Persists across component mounts → switching cars doesn't re-fetch
@@ -20,7 +21,7 @@ function getClientCacheKey(source: string, dest: string, persona?: Persona | nul
 interface UseTripLogicProps {
     source: Location | null;
     destination: Location | null;
-    tripType: 'one-way' | 'round-trip';
+    tripType: 'one-way' | 'round-trip' | 'local';
     baseFare: number;
     perKmRate: number;
     driverAllowancePerDay: number;
@@ -32,6 +33,8 @@ interface UseTripLogicProps {
     pace?: PaceLevel;
     budget?: BudgetLevel;
     carType?: string;
+    isLocal?: boolean;
+    localPackage?: string;
 }
 
 interface UseTripLogicReturn {
@@ -67,6 +70,8 @@ export function useTripLogic({
     pace,
     budget,
     carType,
+    isLocal,
+    localPackage,
 }: UseTripLogicProps): UseTripLogicReturn {
     const [routeData, setRouteData] = useState<RouteData | null>(null);
     const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
@@ -88,6 +93,10 @@ export function useTripLogic({
     const [stageACandidates, setStageACandidates] = useState<AICandidate[]>([]);
     const rerankAbortRef = useRef<AbortController | null>(null);
 
+    const centerLat = source?.lat ?? 0;
+    const centerLng = source?.lng ?? 0;
+    const { photoMap } = useLazyPlacePhotos(stops, centerLat, centerLng);
+
     // Initialize Google Maps Script
     useEffect(() => {
         const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -95,6 +104,32 @@ export function useTripLogic({
             loadGoogleMapsScript(apiKey).catch(err => console.error('Failed to load Maps script:', err));
         }
     }, []);
+
+    useEffect(() => {
+        if (photoMap.size === 0) return;
+        setStops((prev) => {
+            let changed = false;
+            const updated = prev.map((s) => {
+                if (!s.photoUrl && photoMap.has(s.name)) {
+                    changed = true;
+                    return { ...s, photoUrl: photoMap.get(s.name) };
+                }
+                return s;
+            });
+            return changed ? updated : prev;
+        });
+        setRecommendations((prev) => {
+            let changed = false;
+            const updated = prev.map((r) => {
+                if (!r.photoUrl && photoMap.has(r.name)) {
+                    changed = true;
+                    return { ...r, photoUrl: photoMap.get(r.name) };
+                }
+                return r;
+            });
+            return changed ? updated : prev;
+        });
+    }, [photoMap]);
 
     // Ref to keep current stops for callbacks
     const stopsRef = useRef<Stop[]>([]);
@@ -193,6 +228,8 @@ export function useTripLogic({
             persona?: Persona | null;
             pace?: PaceLevel;
             budget?: BudgetLevel;
+            isLocal?: boolean;
+            localPackage?: string;
         } = {},
     ): Promise<AIRouteStopsResponse | null> => {
         // Check client-side cache first (per-persona)
@@ -225,6 +262,8 @@ export function useTripLogic({
                     persona: opts.persona ?? null,
                     pace: opts.pace ?? 'balanced',
                     budget: opts.budget ?? 'standard',
+                    isLocal: opts.isLocal,
+                    localPackage: opts.localPackage,
                 }),
             });
 
@@ -372,6 +411,86 @@ export function useTripLogic({
     const fetchRouteAndStops = useCallback(async () => {
         if (!source || !destination) return;
 
+        // --- Local sightseeing mode: no route needed ---
+        if (isLocal && source) {
+            setIsLoading(true);
+            setError(null);
+            setScoutTip('🤖 Sarathi AI is finding the best local attractions...');
+
+            try {
+                const radiusKm = localPackage === '12hr_120km' ? 120 : 80;
+                setRouteData({
+                    coordinates: [{ lat: source.lat, lng: source.lng }],
+                    distanceKm: radiusKm,
+                    durationMinutes: localPackage === '12hr_120km' ? 720 : 480,
+                });
+
+                const localResponse = await fetchAIStops(source.name, source.name, radiusKm, {
+                    carType,
+                    pickupDate,
+                    pickupTime,
+                    persona: persona ?? null,
+                    pace: pace ?? 'balanced',
+                    budget: budget ?? 'standard',
+                    isLocal: true,
+                    localPackage,
+                });
+
+                if (localResponse?.stops && localResponse.stops.length > 0) {
+                    setRecommendations(localResponse.stops);
+                    setDontMiss(localResponse.dontMiss || []);
+                    setStageACandidates(localResponse.stops as AICandidate[]);
+
+                    const localStops: Stop[] = [
+                        {
+                            id: 'start',
+                            name: source.name,
+                            type: 'start',
+                            location: source,
+                            duration: 0,
+                            suggestedTime: pickupTime || '09:00',
+                            description: 'Pickup point',
+                            leg: 'onward',
+                        },
+                        ...localResponse.stops.map((s, i) => ({
+                            id: `local-stop-${i}`,
+                            name: s.name,
+                            type: s.type as Stop['type'],
+                            location: {
+                                name: s.name,
+                                displayName: `${s.name} - ${s.famousFor || s.description}`,
+                                lat: source.lat + (Math.random() - 0.5) * 0.1,
+                                lng: source.lng + (Math.random() - 0.5) * 0.1,
+                            },
+                            duration: s.suggestedDuration,
+                            description: s.whyVisit || s.description,
+                            isSelected: false,
+                            detourKm: 0,
+                            leg: 'onward' as const,
+                            rating: s.rating,
+                            badges: s.badges,
+                            famousFor: s.famousFor,
+                            bestTimeToVisit: s.bestTimeToVisit,
+                        })),
+                    ];
+                    setStops(localStops);
+                    setSelectedStops(localStops.filter(s => s.type === 'start'));
+                    setScoutTip(`✨ Sarathi found ${localResponse.stops.length} amazing spots in ${source.name}!`);
+                } else {
+                    setStops([{
+                        id: 'start', name: source.name, type: 'start',
+                        location: source, duration: 0, description: 'Pickup point', leg: 'onward',
+                    }]);
+                    setScoutTip('No attractions found. Try a different city.');
+                }
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'An error occurred');
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setScoutTip('🤖 Sarathi AI is finding the best attractions for your journey...');
@@ -425,67 +544,24 @@ export function useTripLogic({
             };
             const onwardResponse = await fetchAIStops(source.name, destination.name, distance, aiOpts);
 
-            // Store recommendations for the showcase component
-            if (onwardResponse?.stops) {
-                setRecommendations(onwardResponse.stops);
-                setDontMiss(onwardResponse.dontMiss || []);
-                // Snapshot for client-side re-rank when sliders change
-                setStageACandidates(onwardResponse.stops as AICandidate[]);
-            }
-
             let finalStops: Stop[] = [];
 
-            // Process onward stops
+            // Process onward stops — skip processAndValidateStops for instant render;
+            // photos are lazily loaded via useLazyPlacePhotos.
             if (onwardResponse?.stops && onwardResponse.stops.length > 0) {
-                const validatedOnward = await processAndValidateStops(
+                setRecommendations(onwardResponse.stops);
+                setDontMiss(onwardResponse.dontMiss || []);
+                setStageACandidates(onwardResponse.stops as AICandidate[]);
+
+                const mappedOnward = convertAIStopsToStops(
                     onwardResponse.stops,
-                    'onward',
+                    route.coordinates,
                     source,
                     destination,
-                    route.coordinates
+                    route.distanceKm,
+                    'onward'
                 );
-
-                if (validatedOnward.length > 0) {
-                    const mappedOnward = convertAIStopsToStops(
-                        validatedOnward,
-                        route.coordinates,
-                        source,
-                        destination,
-                        route.distanceKm,
-                        'onward'
-                    );
-                    finalStops = [...finalStops, ...mappedOnward];
-                } else {
-                    // If validation removed all stops, use raw AI data (with approximate positions)
-                    const mappedOnward = convertAIStopsToStops(
-                        onwardResponse.stops,
-                        route.coordinates,
-                        source,
-                        destination,
-                        route.distanceKm,
-                        'onward'
-                    );
-                    finalStops = [...finalStops, ...mappedOnward];
-                }
-
-                // Update recommendations with photos from validation
-                if (validatedOnward.length > 0) {
-                    setRecommendations(prev => {
-                        const validatedMap = new Map(validatedOnward.map((v) => [v.name, v]));
-                        return prev.map(p => {
-                            const validated = validatedMap.get(p.name);
-                            return validated && validated.photoUrl ? { ...p, photoUrl: validated.photoUrl } : p;
-                        });
-                    });
-
-                    setDontMiss(prev => {
-                        const validatedMap = new Map(validatedOnward.map((v) => [v.name, v]));
-                        return prev.map(p => {
-                            const validated = validatedMap.get(p.name);
-                            return validated && validated.photoUrl ? { ...p, photoUrl: validated.photoUrl } : p;
-                        });
-                    });
-                }
+                finalStops = [...finalStops, ...mappedOnward];
             } else {
                 // Minimal start/end if AI completely fails
                 finalStops.push({
@@ -507,17 +583,8 @@ export function useTripLogic({
                 const returnResponse = await fetchAIStops(destination.name, source.name, distance, aiOpts);
 
                 if (returnResponse?.stops && returnResponse.stops.length > 0) {
-                    const validatedReturn = await processAndValidateStops(
-                        returnResponse.stops,
-                        'return',
-                        destination,
-                        source,
-                        route.coordinates
-                    );
-
-                    const stopsToMap = validatedReturn.length > 0 ? validatedReturn : returnResponse.stops;
                     const mappedReturn = convertAIStopsToStops(
-                        stopsToMap,
+                        returnResponse.stops,
                         route.coordinates,
                         destination,
                         source,
@@ -566,7 +633,7 @@ export function useTripLogic({
         } finally {
             setIsLoading(false);
         }
-    }, [source, destination, baseFare, perKmRate, driverAllowancePerDay, tripType, convertAIStopsToStops, persona, pace, budget, carType, pickupDate, dropDate, pickupTime]);
+    }, [source, destination, baseFare, perKmRate, driverAllowancePerDay, tripType, convertAIStopsToStops, persona, pace, budget, carType, pickupDate, dropDate, pickupTime, isLocal, localPackage]);
 
     // Select a different route
     const selectRoute = useCallback((routeId: string) => {
