@@ -39,6 +39,8 @@ interface ScoutContainerProps {
     onTripStatsUpdate?: (tripStats: TripStats, selectedStops: Stop[]) => void;
     isInModal?: boolean;
     persona?: Persona | null;
+    isLocal?: boolean;
+    localPackage?: string;
 }
 
 export default function ScoutContainer({
@@ -54,6 +56,8 @@ export default function ScoutContainer({
     onTripStatsUpdate,
     isInModal = false,
     persona = null,
+    isLocal = false,
+    localPackage,
 }: ScoutContainerProps) {
     const [focusedStopId, setFocusedStopId] = useState<string | undefined>();
     const [showDestinationChanger, setShowDestinationChanger] = useState(false);
@@ -94,6 +98,8 @@ export default function ScoutContainer({
         pace,
         budget,
         carType: car.type,
+        isLocal,
+        localPackage,
     });
 
     // Update parent with new price when tripStats changes
