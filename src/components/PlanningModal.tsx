@@ -20,6 +20,8 @@ interface PlanningModalProps {
     dropDate?: string;
     pickupTime?: string;
     persona?: Persona | null;
+    isLocal?: boolean;
+    localPackage?: string;
 }
 
 export default function PlanningModal({
@@ -33,6 +35,8 @@ export default function PlanningModal({
     dropDate,
     pickupTime,
     persona,
+    isLocal,
+    localPackage,
 }: PlanningModalProps) {
     const [currentPrice, setCurrentPrice] = useState(car.baseFare);
     const [currentTripStats, setCurrentTripStats] = useState<TripStats | null>(null);
@@ -175,6 +179,8 @@ export default function PlanningModal({
                                     onTripStatsUpdate={handleTripStatsUpdate}
                                     isInModal={true}
                                     persona={persona ?? null}
+                                    isLocal={isLocal}
+                                    localPackage={localPackage}
                                 />
                             </div>
 

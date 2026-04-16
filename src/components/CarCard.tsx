@@ -27,9 +27,11 @@ interface CarCardProps {
     pickupDate?: string;
     dropDate?: string;
     pickupTime?: string;
+    isLocal?: boolean;
+    localPackage?: string;
 }
 
-export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime }: CarCardProps) {
+export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime, isLocal, localPackage }: CarCardProps) {
     const [showPlanningModal, setShowPlanningModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [showPersonaPicker, setShowPersonaPicker] = useState(false);
@@ -199,6 +201,8 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                 dropDate={dropDate}
                 pickupTime={pickupTime}
                 persona={chosenPersona}
+                isLocal={isLocal}
+                localPackage={localPackage}
             />
 
             {/* Direct Booking Modal (without customization) */}

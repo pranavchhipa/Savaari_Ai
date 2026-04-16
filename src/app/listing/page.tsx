@@ -740,10 +740,12 @@ export default function ListingPage() {
                                     car={car}
                                     source={source}
                                     destination={tripType === 'local' ? source : destination}
-                                    tripType={tripType === 'local' ? 'one-way' : tripType}
+                                    tripType={tripType}
                                     pickupDate={pickupDate}
                                     dropDate={dropDate}
                                     pickupTime={pickupTime}
+                                    isLocal={tripType === 'local'}
+                                    localPackage={localPackage}
                                 />
                             </motion.div>
                         ))
