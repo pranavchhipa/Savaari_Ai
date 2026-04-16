@@ -1,7 +1,7 @@
 // Server-only module (imports env vars + calls OpenRouter).
 
 import type { AICandidate, TravelContext } from '@/types';
-import { stageAPrompt } from './prompts';
+import { stageAPrompt, stageALocalPrompt } from './prompts';
 
 const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -13,6 +13,9 @@ const STAGE_A_TTL = 60 * 60 * 1000; // 1 hour
 function stageACacheKey(ctx: TravelContext): string {
   const season = new Date(ctx.pickupDate).getMonth();
   const daypart = parseInt(ctx.pickupTime.split(':')[0], 10);
+  if (ctx.isLocal) {
+    return `local-${ctx.source.toLowerCase()}-${ctx.carType}-${ctx.radiusKm ?? 80}-${season}-${daypart}`;
+  }
   return `${ctx.source.toLowerCase()}-${ctx.destination.toLowerCase()}-${ctx.carType}-${season}-${daypart}`;
 }
 
@@ -30,7 +33,7 @@ export async function generateCandidates(ctx: TravelContext): Promise<AICandidat
     return null;
   }
 
-  const prompt = stageAPrompt({ ctx });
+  const prompt = ctx.isLocal ? stageALocalPrompt({ ctx }) : stageAPrompt({ ctx });
 
   try {
     const response = await fetch(OPENROUTER_API, {

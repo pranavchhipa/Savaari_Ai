@@ -15,6 +15,8 @@ interface GenerateStopsBody {
     persona?: Persona | null;
     pace?: PaceLevel;
     budget?: BudgetLevel;
+    isLocal?: boolean;
+    localPackage?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
         const body = (await request.json()) as GenerateStopsBody;
         const { source, destination, distanceKm } = body;
 
-        if (!source || !destination || !distanceKm) {
+        if (!source || (!body.isLocal && !destination) || (!body.isLocal && !distanceKm)) {
             return NextResponse.json(
                 { error: 'Missing required fields: source, destination, distanceKm' },
                 { status: 400 },
@@ -35,14 +37,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(legacy ?? { error: 'Failed to generate', fallback: true });
         }
 
+        const radiusKm = body.localPackage === '12hr_120km' ? 120 : 80;
+
         const ctx: TravelContext = {
             source,
-            destination,
-            distanceKm,
+            destination: body.isLocal ? source : destination,
+            distanceKm: body.isLocal ? radiusKm : distanceKm,
             carType: body.carType ?? 'Sedan',
             pickupDate: body.pickupDate ?? new Date().toISOString().split('T')[0],
             pickupTime: body.pickupTime ?? '09:00',
             totalDays: body.totalDays ?? 1,
+            isLocal: body.isLocal ?? false,
+            localPackage: body.localPackage as any,
+            radiusKm: body.isLocal ? radiusKm : undefined,
         };
 
         const result = await generateStopsForContext({

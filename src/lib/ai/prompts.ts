@@ -125,6 +125,63 @@ OUTPUT (JSON only, no markdown fences):
 ${outputSchema(needsNightHalt)}`;
 }
 
+export interface StageALocalPromptInput {
+  ctx: TravelContext;
+}
+
+export function stageALocalPrompt({ ctx }: StageALocalPromptInput): string {
+  const season = seasonFor(ctx.pickupDate);
+  const daypart = dayPartFor(ctx.pickupTime);
+  const carConstraints = carConstraintsFor(ctx.carType);
+  const radiusKm = ctx.radiusKm ?? 80;
+  const hours = radiusKm <= 80 ? 8 : 12;
+
+  return `You are Sarathi, Savaari's expert AI travel advisor for Indian local sightseeing.
+
+CONTEXT
+Pickup city: "${ctx.source}"
+Package: ${hours} hours / ${radiusKm} km radius
+Vehicle: ${ctx.carType} — ${carConstraints}
+Date: ${ctx.pickupDate} at ${ctx.pickupTime} (${season}, ${daypart})
+
+TASK
+Suggest 10-15 REAL, FAMOUS sightseeing spots within ${radiusKm} km of ${ctx.source} city center. These spots should form a logical day-trip circuit. Include VARIETY — mix heritage, nature, viewpoints, cultural, food, markets.
+
+RULES
+- Every stop must be a REAL, NAMED, FAMOUS place in or near ${ctx.source} (Google-searchable).
+- approximateKm is distance from city center (sorted by recommended visit order, NOT by distance).
+- detourKm is 0 for all (everything is within the city radius).
+- Each stop MUST have a "tags" array from: kid-safe, scenic, romantic, adventure, offbeat, cultural-depth, quick-stop, paid-entry, free, photo-op.
+- Include entryFeeInr (0 for free).
+- DO NOT include: hotels, petrol pumps, malls, hospitals, fictional places.
+- Order stops in a logical sightseeing sequence for a day trip starting at ${ctx.pickupTime}.
+
+OUTPUT (JSON only, no markdown fences):
+${localOutputSchema()}`;
+}
+
+function localOutputSchema(): string {
+  return `{
+  "stops": [
+    {
+      "name": "Exact Famous Place",
+      "type": "heritage|tourist|nature|adventure|cultural|viewpoint|food",
+      "description": "2-sentence vivid description",
+      "whyVisit": "One compelling reason",
+      "famousFor": "What makes it iconic",
+      "rating": 4.5,
+      "badges": ["must-visit"],
+      "approximateKm": 5,
+      "detourKm": 0,
+      "suggestedDuration": 45,
+      "bestTimeToVisit": "morning",
+      "tags": ["scenic", "photo-op"],
+      "entryFeeInr": 50
+    }
+  ]
+}`;
+}
+
 export interface StageBPromptInput {
   ctx: TravelContext;
   persona: Persona;
