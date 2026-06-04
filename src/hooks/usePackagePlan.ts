@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type {
   Location,
   Car,
@@ -69,7 +69,6 @@ export function usePackagePlan({
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [transferKm, setTransferKm] = useState<number>(0);
   const [usedAi, setUsedAi] = useState(false);
-  const photoFetched = useRef<Set<string>>(new Set());
 
   const days = Math.max(1, Math.floor(numDays || 1));
 
@@ -189,6 +188,41 @@ export function usePackagePlan({
         setError(`No curated attractions for ${destination.name} yet. Add an OPENROUTER_API_KEY to generate any city, or try Mysore / Ooty / Coorg / Goa / Jaipur.`);
       }
       setIsLoading(false);
+
+      // Lazy-load real photos (throttled to 3 at a time, one retry) — runs in
+      // the background and does NOT depend on `attractions`, so applying a photo
+      // never cancels the in-flight fetches.
+      const destName = destination.name;
+      const fetchPhoto = async (name: string, attempt = 0): Promise<string | null> => {
+        try {
+          const r = await fetch('/api/google/place-photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: `${name}, ${destName}` }),
+          });
+          if (r.ok) { const j = await r.json(); if (j.photoUrl) return j.photoUrl as string; }
+        } catch { /* ignore */ }
+        if (attempt < 1 && !cancelled) {
+          await new Promise((res) => setTimeout(res, 500));
+          return fetchPhoto(name, attempt + 1);
+        }
+        return null;
+      };
+      void (async () => {
+        const items = [...pool];
+        let idx = 0;
+        const worker = async () => {
+          while (idx < items.length && !cancelled) {
+            const a = items[idx++];
+            const url = await fetchPhoto(a.name);
+            if (cancelled || !url) continue;
+            const key = recKey(a);
+            setAttractions((prev) => prev.map((x) => (recKey(x) === key ? { ...x, photoUrl: url } : x)));
+            setStopByKey((prev) => { const m = new Map(prev); const s = m.get(key); if (s) m.set(key, { ...s, photoUrl: url }); return m; });
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(3, items.length) }, worker));
+      })();
     })();
 
     return () => {
@@ -196,40 +230,6 @@ export function usePackagePlan({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination?.name, destination?.lat, destination?.lng, persona, days]);
-
-  // Lazy-load real photos for each attraction via Places (New).
-  useEffect(() => {
-    if (attractions.length === 0 || !destination?.name) return;
-    let cancelled = false;
-    const pending = attractions.filter((a) => !a.photoUrl && !photoFetched.current.has(recKey(a)));
-    if (pending.length === 0) return;
-    pending.forEach((a) => photoFetched.current.add(recKey(a)));
-    (async () => {
-      await Promise.all(
-        pending.map(async (a) => {
-          try {
-            const res = await fetch('/api/google/place-photo', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query: `${a.name}, ${destination.name}` }),
-            });
-            if (!res.ok) return;
-            const { photoUrl } = await res.json();
-            if (cancelled || !photoUrl) return;
-            const key = recKey(a);
-            setAttractions((prev) => prev.map((x) => (recKey(x) === key ? { ...x, photoUrl } : x)));
-            setStopByKey((prev) => {
-              const m = new Map(prev);
-              const s = m.get(key);
-              if (s) m.set(key, { ...s, photoUrl });
-              return m;
-            });
-          } catch { /* ignore */ }
-        }),
-      );
-    })();
-    return () => { cancelled = true; };
-  }, [attractions, destination?.name]);
 
   // ---- Derived: selected stops → day plan ----
   const transferDriveHours = useMemo(
