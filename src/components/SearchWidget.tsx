@@ -156,16 +156,16 @@ export default function SearchWidget() {
                         </div>
                     </div>
 
-                    <div className="w-full md:w-auto">
-                        <motion.button
-                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleSubmit} disabled={isLoading}
-                            className="w-full md:w-auto px-8 py-3 bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#FB923C] hover:to-[#F97316] text-white rounded-xl font-semibold text-sm tracking-wide shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-                        >
-                            {isLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search className="w-4 h-4" />}
-                            <span>{isLoading ? 'Searching...' : 'Explore Packages'}</span>
-                        </motion.button>
-                    </div>
                 </div>
+
+                {/* Explore button — full-width bar */}
+                <motion.button
+                    whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={handleSubmit} disabled={isLoading}
+                    className="w-full mt-4 px-8 py-3.5 bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#FB923C] hover:to-[#F97316] text-white rounded-xl font-bold text-base tracking-wide shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                    {isLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search className="w-5 h-5" />}
+                    <span>{isLoading ? 'Searching...' : 'Explore Packages'}</span>
+                </motion.button>
 
                 {/* Trust strip */}
                 <div className="text-center text-xs text-gray-400 mt-4">
