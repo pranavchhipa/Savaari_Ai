@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Calendar, Sparkles, MapPin, ArrowRight } from 'lucide-react';
+import { ChevronLeft, Calendar, MapPin, ArrowRight } from 'lucide-react';
 import { Location, SearchParams } from '@/types';
-import { getPackages, TravelPackage, PackageTripType, TRIP_TYPE_LABEL } from '@/lib/packages';
+import {
+    getPackages, TravelPackage, PackageTripType, PackagePersona,
+    TRIP_TYPE_LABEL, PACKAGE_PERSONAS, PERSONA_ORDER,
+} from '@/lib/packages';
 import PackageCard from '@/components/PackageCard';
 import PackageDetailModal from '@/components/PackageDetailModal';
 
@@ -20,6 +23,7 @@ export default function PackagesPage() {
     const [destination, setDestination] = useState<Location | null>(DEFAULT_DEST);
     const [pickupDate, setPickupDate] = useState('');
     const [selected, setSelected] = useState<TravelPackage | null>(null);
+    const [activePersona, setActivePersona] = useState<'all' | PackagePersona>('all');
     const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
@@ -39,10 +43,9 @@ export default function PackagesPage() {
 
     const isLocal = tripType === 'local';
     const destCity = isLocal ? source : (destination ?? DEFAULT_DEST);
-    const packages = useMemo(
-        () => getPackages(tripType, source.name, destCity.name),
-        [tripType, source, destCity],
-    );
+    const allPkgs = useMemo(() => getPackages(tripType, source.name, destCity.name), [tripType, source, destCity]);
+    const present = PERSONA_ORDER.filter((per) => allPkgs.some((p) => p.persona === per));
+    const filtered = activePersona === 'all' ? allPkgs : allPkgs.filter((p) => p.persona === activePersona);
 
     const heading = isLocal
         ? `${source.name} day packages`
@@ -50,7 +53,7 @@ export default function PackagesPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
-            {/* Sticky header */}
+            {/* Sticky route header */}
             <div className="sticky top-16 z-40 bg-white border-b border-gray-100 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
                     <button onClick={() => router.push('/')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -77,15 +80,36 @@ export default function PackagesPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20">
-                        <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900">{heading}</h1>
-                </div>
-                <p className="text-gray-500 mb-6 ml-11">Pick a curated trip — choose your car and book in a couple of taps.</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{heading}</h1>
+                <p className="text-gray-500 mt-1 mb-6">Pick a curated trip — choose your car and book in a couple of taps.</p>
 
-                {!loaded ? null : packages.length === 0 ? (
+                {/* Category filters */}
+                {loaded && allPkgs.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-7">
+                        <button
+                            onClick={() => setActivePersona('all')}
+                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${activePersona === 'all' ? 'bg-[#2563EB] text-white shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                        >
+                            All <span className="opacity-70">({allPkgs.length})</span>
+                        </button>
+                        {present.map((per) => {
+                            const m = PACKAGE_PERSONAS[per];
+                            const n = allPkgs.filter((p) => p.persona === per).length;
+                            const active = activePersona === per;
+                            return (
+                                <button
+                                    key={per}
+                                    onClick={() => setActivePersona(per)}
+                                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${active ? `${m.solid} text-white shadow-md` : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                >
+                                    {m.emoji} {m.label} <span className="opacity-70">({n})</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {!loaded ? null : allPkgs.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="text-4xl mb-3">🧳</div>
                         <h3 className="text-lg font-semibold text-gray-800 mb-1">No packages for this route yet</h3>
@@ -94,7 +118,7 @@ export default function PackagesPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {packages.map((p, i) => <PackageCard key={p.id} pkg={p} index={i} onSelect={setSelected} />)}
+                        {filtered.map((p, i) => <PackageCard key={p.id} pkg={p} index={i} onSelect={setSelected} />)}
                     </div>
                 )}
             </div>

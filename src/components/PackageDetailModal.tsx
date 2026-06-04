@@ -192,8 +192,8 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                                             <div className="font-semibold text-sm text-gray-800 truncate">{car.name}</div>
                                                             <div className="text-[11px] text-gray-500 flex items-center gap-2">
                                                                 <span>{car.type}</span>
-                                                                <span className="flex items-center gap-0.5"><Users className="w-3 h-3" />{car.seats}</span>
-                                                                <span className="flex items-center gap-0.5 text-amber-500"><Star className="w-3 h-3 fill-current" />{car.rating}</span>
+                                                                <span className="flex items-center gap-0.5"><Users className="w-3 h-3" />{car.seats} seats</span>
+                                                                {car.ac && <span>· AC</span>}
                                                             </div>
                                                         </div>
                                                         <div className="font-bold text-sm text-gray-900">{formatCurrency(price)}</div>

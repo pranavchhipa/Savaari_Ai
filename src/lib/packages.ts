@@ -10,13 +10,16 @@ import { cheapestCar } from './cars';
 import type { Car, TripStats } from '@/types';
 
 export type PackageTripType = 'one-way' | 'round-trip' | 'local';
-export type PackagePersona = 'family' | 'romantic' | 'solo';
+export type PackagePersona = 'family' | 'romantic' | 'solo' | 'friends';
 
-export const PACKAGE_PERSONAS: Record<PackagePersona, { label: string; emoji: string; chip: string }> = {
-    family: { label: 'Family', emoji: '👨‍👩‍👧', chip: 'bg-emerald-100 text-emerald-700' },
-    romantic: { label: 'Romantic', emoji: '💑', chip: 'bg-rose-100 text-rose-700' },
-    solo: { label: 'Solo', emoji: '🧳', chip: 'bg-indigo-100 text-indigo-700' },
+export const PACKAGE_PERSONAS: Record<PackagePersona, { label: string; emoji: string; chip: string; solid: string }> = {
+    family: { label: 'Family', emoji: '👨‍👩‍👧', chip: 'bg-emerald-100 text-emerald-700', solid: 'bg-emerald-500' },
+    romantic: { label: 'Romantic', emoji: '💑', chip: 'bg-rose-100 text-rose-700', solid: 'bg-rose-500' },
+    solo: { label: 'Solo', emoji: '🧳', chip: 'bg-indigo-100 text-indigo-700', solid: 'bg-indigo-500' },
+    friends: { label: 'Friends', emoji: '🧑‍🤝‍🧑', chip: 'bg-amber-100 text-amber-700', solid: 'bg-amber-500' },
 };
+
+export const PERSONA_ORDER: PackagePersona[] = ['family', 'romantic', 'solo', 'friends'];
 
 export const TRIP_TYPE_LABEL: Record<PackageTripType, string> = {
     'one-way': 'One Way',
@@ -147,6 +150,56 @@ const PACKAGES: TravelPackage[] = [
         title: 'Mysore Heritage Day', tagline: 'Palace, art gallery, market and cathedral.',
         durationDays: 1, nights: 0, transferKm: 0, heroAttractionId: 'mysore-1',
         days: [{ day: 1, title: 'A day in Mysuru', attractionIds: ['mysore-1', 'mysore-7', 'mysore-8', 'mysore-5'] }],
+        inclusions: INC_LOCAL, exclusions: EXC,
+    },
+
+    // ===== Friends + extra variants =====
+    {
+        id: 'ow-blr-mys-friends', tripType: 'one-way', persona: 'friends', from: 'Bangalore', to: 'Mysore',
+        title: 'Mysore Highlights — Friends', tagline: 'Sholay rocks photo-op, palace and the fountain show.',
+        durationDays: 1, nights: 0, transferKm: 150, heroAttractionId: 'mysore-1',
+        days: [{ day: 1, title: 'Bangalore to Mysore', attractionIds: ['enroute-1', 'mysore-1', 'mysore-2', 'mysore-3'] }],
+        inclusions: INC_ONEWAY, exclusions: EXC,
+    },
+    {
+        id: 'ow-blr-mys-express', tripType: 'one-way', persona: 'family', from: 'Bangalore', to: 'Mysore',
+        title: 'Mysore Express Dash', tagline: 'Straight to the three must-sees — palace, hills, fountain.',
+        durationDays: 1, nights: 0, transferKm: 150, heroAttractionId: 'mysore-2',
+        days: [{ day: 1, title: 'Bangalore to Mysore', attractionIds: ['mysore-1', 'mysore-2', 'mysore-3'] }],
+        inclusions: INC_ONEWAY, exclusions: EXC,
+    },
+    {
+        id: 'rt-blr-mys-friends', tripType: 'round-trip', persona: 'friends', from: 'Bangalore', to: 'Mysore',
+        title: 'Mysore Friends Trip', tagline: 'Forts, gardens and a lively two-day road trip.',
+        durationDays: 2, nights: 1, transferKm: 150, heroAttractionId: 'mysore-3',
+        days: [
+            { day: 1, title: 'Palace & gardens', attractionIds: ['mysore-1', 'mysore-3', 'mysore-2'] },
+            { day: 2, title: 'Forts & lakes', attractionIds: ['enroute-3', 'mysore-6', 'mysore-9'] },
+        ],
+        inclusions: INC_RT, exclusions: EXC,
+    },
+    {
+        id: 'rt-blr-mys-grand', tripType: 'round-trip', persona: 'romantic', from: 'Bangalore', to: 'Mysore',
+        title: 'Grand Mysore Weekend', tagline: 'The full royal experience over a relaxed two days.',
+        durationDays: 2, nights: 1, transferKm: 150, heroAttractionId: 'mysore-1',
+        days: [
+            { day: 1, title: 'Palaces & fountain', attractionIds: ['mysore-1', 'mysore-7', 'mysore-3'] },
+            { day: 2, title: 'Hills, lakes & faith', attractionIds: ['mysore-2', 'mysore-10', 'mysore-6', 'mysore-5'] },
+        ],
+        inclusions: INC_RT, exclusions: EXC,
+    },
+    {
+        id: 'lo-blr-friends', tripType: 'local', persona: 'friends', from: 'Bangalore', to: 'Bangalore',
+        title: 'Bangalore with Friends', tagline: 'Sunrise at Nandi Hills, parks and the city buzz.',
+        durationDays: 1, nights: 0, transferKm: 0, heroAttractionId: 'bangalore-9',
+        days: [{ day: 1, title: 'A day in Bengaluru', attractionIds: ['bangalore-9', 'bangalore-3', 'bangalore-10', 'bangalore-8'] }],
+        inclusions: INC_LOCAL, exclusions: EXC,
+    },
+    {
+        id: 'lo-mys-friends', tripType: 'local', persona: 'friends', from: 'Mysore', to: 'Mysore',
+        title: 'Mysore with Friends', tagline: 'Hilltop views, gardens, zoo and the fountain.',
+        durationDays: 1, nights: 0, transferKm: 0, heroAttractionId: 'mysore-3',
+        days: [{ day: 1, title: 'A day in Mysuru', attractionIds: ['mysore-2', 'mysore-3', 'mysore-4', 'mysore-6'] }],
         inclusions: INC_LOCAL, exclusions: EXC,
     },
 ];
