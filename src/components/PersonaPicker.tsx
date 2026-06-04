@@ -133,7 +133,7 @@ export default function PersonaPicker({ isOpen, onClose, onSelect, source, desti
                             <div>
                                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-100 rounded-full mb-3">
                                     <Sparkles className="w-3.5 h-3.5 text-[#F97316]" />
-                                    <span className="text-[11px] font-semibold text-[#2563EB] tracking-wide uppercase">Sarathi AI</span>
+                                    <span className="text-[11px] font-semibold text-[#2563EB] tracking-wide uppercase">Personalize</span>
                                 </div>
                                 <h2 className="text-2xl md:text-[28px] font-bold text-gray-900 leading-tight">
                                     Who are you travelling with?

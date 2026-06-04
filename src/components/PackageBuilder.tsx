@@ -123,7 +123,7 @@ export default function PackageBuilder({
                         <Loader2 className="w-12 h-12 text-[#2563EB] animate-spin mx-auto mb-4" />
                         <Sparkles className="w-5 h-5 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
                     </div>
-                    <p className="font-semibold text-gray-700">Sarathi AI is building your {destination.name} plan...</p>
+                    <p className="font-semibold text-gray-700">Building your {destination.name} plan...</p>
                     <p className="text-sm text-gray-400 mt-1">Finding the best things to do, day by day</p>
                 </div>
             </div>
@@ -321,7 +321,7 @@ export default function PackageBuilder({
 
             {usedAi && (
                 <div className="px-4 py-2 text-[11px] text-gray-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-400" /> Generated live by Sarathi AI
+                    <Sparkles className="w-3 h-3 text-amber-400" /> Curated for you
                 </div>
             )}
         </motion.div>

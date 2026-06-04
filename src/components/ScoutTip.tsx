@@ -61,7 +61,7 @@ export default function ScoutTip({ tip, type = 'info' }: ScoutTipProps) {
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                         <h4 className={`font-semibold ${titleColors[type]}`}>
-                            Sarathi™ Suggests
+                            Good to know
                         </h4>
                     </div>
                     <p className={`text-sm ${textColors[type]} leading-relaxed`}>{tip}</p>

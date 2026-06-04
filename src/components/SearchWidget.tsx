@@ -301,11 +301,11 @@ export default function SearchWidget() {
                     </div>
                 </div>
 
-                {/* Powered by AI strip */}
+                {/* Trust strip */}
                 <div className="px-6 py-3 bg-gradient-to-r from-gray-50 to-blue-50/50 border-t border-gray-100 rounded-b-2xl">
                     <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
                         <Sparkles className="w-3 h-3 text-[#F97316]" />
-                        <span>Powered by <span className="font-semibold text-gray-500">Sarathi AI™</span> — Smart routes & handpicked attractions</span>
+                        <span>Curated packages · Handpicked stops · Transparent all-inclusive pricing</span>
                     </div>
                 </div>
             </div>

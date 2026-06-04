@@ -13,16 +13,14 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Savaari — Road Trips, Reimagined | Powered by Sarathi AI",
-  description: "Experience the future of road trips with Savaari, powered by Sarathi AI. Smart route planning, curated stops, and seamless outstation car rentals.",
-  keywords: "Savaari, Sarathi AI, AI trip planner, road trip planner, outstation cabs, car rental India",
+  title: "Savaari — Curated Road-Trip Packages",
+  description: "Book curated outstation & local road-trip packages with handpicked stops, verified drivers and all-inclusive pricing.",
+  keywords: "Savaari, road trip packages, outstation cabs, local sightseeing, car rental India, Bangalore Mysore packages",
   openGraph: {
-    title: "Savaari — Road Trips, Reimagined | Powered by Sarathi AI",
-    description: "Plan your perfect road trip with Savaari. Smart routes, hidden gems, and seamless bookings — powered by Sarathi AI.",
+    title: "Savaari — Curated Road-Trip Packages",
+    description: "Handpicked stops, all-inclusive pricing, zero planning. One-way, round-trip & local packages.",
     siteName: "Savaari",
-    images: [{
-      url: "/opengraph-image",
-    }],
+    images: [{ url: "/opengraph-image" }],
   },
 };
 

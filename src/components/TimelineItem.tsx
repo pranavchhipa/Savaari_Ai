@@ -289,7 +289,7 @@ export default function TimelineItem({
                                                 <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
                                             </svg>
                                             <span className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide">
-                                                Sarathi™ Recommends
+                                                Recommended
                                             </span>
                                         </div>
                                     )}
@@ -297,7 +297,7 @@ export default function TimelineItem({
                                     {isLoading ? (
                                         <div className="flex items-center gap-2 py-4">
                                             <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                                            <span className="text-sm text-gray-500">Sarathi is finding details...</span>
+                                            <span className="text-sm text-gray-500">Finding details...</span>
                                         </div>
                                     ) : isStartOrEnd ? (
                                         <p className="text-sm text-gray-600">{getStartEndInfo()}</p>

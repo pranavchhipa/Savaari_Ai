@@ -178,7 +178,7 @@ export default function RecommendationShowcase({
                         </div>
                         <div>
                             <h3 className="font-bold text-gray-800 text-sm">
-                                {title || 'Sarathi Recommends'}
+                                {title || 'Recommended stops'}
                             </h3>
                             <p className="text-[10px] text-gray-500">
                                 {subtitle || 'Tourist attractions along your route'}

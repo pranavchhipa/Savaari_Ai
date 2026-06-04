@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
 
-export const alt = 'Sarathi AI - Road Trips Reimagined';
+export const alt = 'Savaari - Road Trips Reimagined';
 export const size = {
     width: 1200,
     height: 630,
@@ -44,7 +44,7 @@ export default function Image() {
                     S
                 </div>
                 <div style={{ fontSize: '80px', fontWeight: 'bold', marginBottom: '20px', fontFamily: 'sans-serif' }}>
-                    Sarathi AI
+                    Savaari
                 </div>
                 <div style={{ fontSize: '32px', fontFamily: 'sans-serif', opacity: 0.9 }}>
                     Road Trips, Reimagined

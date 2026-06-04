@@ -272,7 +272,7 @@ export default function ScoutContainer({
                         <Loader2 className="w-12 h-12 text-[#2563EB] animate-spin mx-auto mb-4" />
                         <Sparkles className="w-5 h-5 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
                     </div>
-                    <p className="font-semibold text-gray-700">Sarathi AI is planning your journey...</p>
+                    <p className="font-semibold text-gray-700">Planning your journey...</p>
                     <p className="text-sm text-gray-400 mt-1">Finding routes, attractions & hidden gems</p>
                 </div>
             </div>

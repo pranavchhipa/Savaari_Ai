@@ -564,7 +564,7 @@ export default function ListingPage() {
                             {filteredAndSortedCars.length} cars available
                         </h1>
                         <p className="text-sm text-gray-500 mt-1">
-                            Select a car to plan your journey with Sarathi AI™
+                            Select a car to plan your journey
                         </p>
                     </div>
 
@@ -788,7 +788,7 @@ export default function ListingPage() {
                             <h3 className="text-xl font-bold mb-2">Why book with Savaari?</h3>
                             <p className="text-blue-100 text-sm max-w-md">
                                 Transparent pricing, verified drivers, and 24x7 support.
-                                Plan your perfect trip with Sarathi AI.
+                                Plan your perfect trip with Savaari.
                             </p>
                         </div>
                         <div className="flex items-center gap-4">

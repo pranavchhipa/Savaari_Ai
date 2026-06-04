@@ -19,7 +19,7 @@ export default function Header() {
                         <Logo className="w-10 h-10 group-hover:scale-105 transition-transform duration-300" />
                         <div className="flex items-baseline gap-1.5">
                             <span className="text-2xl font-bold text-gray-900 tracking-tight">Savaari</span>
-                            <span className="text-[10px] font-semibold text-[#F97316] tracking-wide uppercase">Powered by Sarathi AI</span>
+                            <span className="text-[10px] font-semibold text-[#F97316] tracking-wide uppercase">Road-Trip Packages</span>
                         </div>
                     </Link>
 
@@ -28,8 +28,8 @@ export default function Header() {
                         <Link href="/" className="text-sm font-medium text-gray-600 hover:text-[#2563EB] transition-colors">
                             Home
                         </Link>
-                        <Link href="/listing" className="text-sm font-medium text-gray-600 hover:text-[#2563EB] transition-colors">
-                            Book a Cab
+                        <Link href="/" className="text-sm font-medium text-gray-600 hover:text-[#2563EB] transition-colors">
+                            Packages
                         </Link>
                     </nav>
 
@@ -43,7 +43,7 @@ export default function Header() {
                             <span>9045-450-000</span>
                         </a>
                         <Link
-                            href="/listing"
+                            href="/"
                             className="px-5 py-2 bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-orange-500/25 transition-all"
                         >
                             Get App
@@ -78,11 +78,11 @@ export default function Header() {
                                 Home
                             </Link>
                             <Link
-                                href="/listing"
+                                href="/"
                                 className="block py-2.5 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                Book a Cab
+                                Packages
                             </Link>
                             <a
                                 href="tel:+919045450000"
