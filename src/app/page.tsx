@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Package, Shield, IndianRupee, Headphones, Star, ArrowRight } from 'lucide-react';
+import { Package, Shield, IndianRupee, Headphones, ArrowRight } from 'lucide-react';
 import SearchWidget from '@/components/SearchWidget';
 import PackageCard from '@/components/PackageCard';
 import Logo from '@/components/Logo';
@@ -43,45 +43,44 @@ export default function Home() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* HERO + SEARCH (on top) */}
-            <section className="relative bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] pt-12 pb-32 overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-[#2563EB]/20 rounded-full blur-[120px]" />
-                <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#F97316]/15 rounded-full blur-[100px]" />
-                <div
-                    className="absolute inset-0 opacity-[0.04]"
-                    style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}
-                />
+            <section className="relative pt-6 pb-24 overflow-hidden bg-[#0F172A]">
+                {/* Scenic background */}
+                <div className="absolute inset-0 z-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop"
+                        alt=""
+                        className="w-full h-full object-cover opacity-45"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/75 to-[#0F172A]/40" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/70 to-transparent" />
+                </div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-[#2563EB]/20 rounded-full blur-[120px] z-0" />
 
                 <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
-                    <motion.div
-                        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md text-white/90 rounded-full text-xs font-medium mb-6 border border-white/15"
-                    >
-                        <Star className="w-3.5 h-3.5 text-[#F97316] fill-[#F97316]" />
-                        India&apos;s Most Trusted Car Rental
-                    </motion.div>
                     <motion.h1
-                        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-                        className="text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight"
+                        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                        className="text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight drop-shadow-xl"
                     >
                         Curated road-trip{' '}
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#60A5FA] via-[#818CF8] to-[#A78BFA]">packages</span>
                     </motion.h1>
                     <motion.p
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-                        className="text-base md:text-lg text-gray-300 mt-4 max-w-2xl mx-auto"
+                        className="text-base md:text-lg text-gray-200 mt-3 max-w-2xl mx-auto drop-shadow"
                     >
-                        Handpicked stops, all-inclusive pricing, zero planning. One-way, round-trip &amp; local — pick a trip and go.
+                        Handpicked stops, all-inclusive pricing, zero planning — pick a trip and go.
                     </motion.p>
 
                     {/* SEARCH WIDGET — on top */}
-                    <div className="mt-9">
+                    <div className="mt-7">
                         <SearchWidget />
                     </div>
                 </div>
             </section>
 
             {/* FEATURED PACKAGES */}
-            <section className="relative z-20 -mt-16 pb-4">
+            <section className="py-14">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-end justify-between mb-5">
                         <div>
