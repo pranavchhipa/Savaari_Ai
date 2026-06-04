@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, ArrowRight, Sparkles } from 'lucide-react';
 import { Car, Location, TripStats, Stop, Persona } from '@/types';
 import ScoutContainer from './ScoutContainer';
+import PackageBuilder from './PackageBuilder';
 import BillingFooter from './BillingFooter';
 import BookingModal from './BookingModal';
 import { PERSONAS } from './PersonaPicker';
@@ -15,13 +16,15 @@ interface PlanningModalProps {
     car: Car;
     source: Location;
     destination: Location;
-    tripType: 'one-way' | 'round-trip' | 'local';
+    tripType: 'one-way' | 'round-trip' | 'local' | 'package';
     pickupDate?: string;
     dropDate?: string;
     pickupTime?: string;
     persona?: Persona | null;
     isLocal?: boolean;
     localPackage?: string;
+    isPackage?: boolean;
+    tripDays?: number;
 }
 
 export default function PlanningModal({
@@ -37,6 +40,8 @@ export default function PlanningModal({
     persona,
     isLocal,
     localPackage,
+    isPackage,
+    tripDays,
 }: PlanningModalProps) {
     const [currentPrice, setCurrentPrice] = useState(car.baseFare);
     const [currentTripStats, setCurrentTripStats] = useState<TripStats | null>(null);
@@ -166,22 +171,39 @@ export default function PlanningModal({
 
                             {/* Body — scrollable */}
                             <div className="flex-1 overflow-y-auto">
-                                <ScoutContainer
-                                    source={source}
-                                    destination={currentDestination}
-                                    car={car}
-                                    tripType={tripType}
-                                    onPriceUpdate={handlePriceUpdate}
-                                    pickupDate={pickupDate}
-                                    dropDate={dropDate}
-                                    pickupTime={pickupTime}
-                                    onDestinationChange={handleDestinationChange}
-                                    onTripStatsUpdate={handleTripStatsUpdate}
-                                    isInModal={true}
-                                    persona={persona ?? null}
-                                    isLocal={isLocal}
-                                    localPackage={localPackage}
-                                />
+                                {isPackage ? (
+                                    <PackageBuilder
+                                        source={source}
+                                        destination={currentDestination}
+                                        car={car}
+                                        tripType={tripType}
+                                        onPriceUpdate={handlePriceUpdate}
+                                        pickupDate={pickupDate}
+                                        dropDate={dropDate}
+                                        pickupTime={pickupTime}
+                                        onTripStatsUpdate={handleTripStatsUpdate}
+                                        isInModal={true}
+                                        persona={persona ?? null}
+                                        tripDays={tripDays}
+                                    />
+                                ) : (
+                                    <ScoutContainer
+                                        source={source}
+                                        destination={currentDestination}
+                                        car={car}
+                                        tripType={tripType as 'one-way' | 'round-trip' | 'local'}
+                                        onPriceUpdate={handlePriceUpdate}
+                                        pickupDate={pickupDate}
+                                        dropDate={dropDate}
+                                        pickupTime={pickupTime}
+                                        onDestinationChange={handleDestinationChange}
+                                        onTripStatsUpdate={handleTripStatsUpdate}
+                                        isInModal={true}
+                                        persona={persona ?? null}
+                                        isLocal={isLocal}
+                                        localPackage={localPackage}
+                                    />
+                                )}
                             </div>
 
                             {/* Sticky Billing Footer */}

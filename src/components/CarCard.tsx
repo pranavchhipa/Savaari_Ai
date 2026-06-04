@@ -23,15 +23,17 @@ interface CarCardProps {
     car: Car;
     source: Location;
     destination: Location;
-    tripType: 'one-way' | 'round-trip' | 'local';
+    tripType: 'one-way' | 'round-trip' | 'local' | 'package';
     pickupDate?: string;
     dropDate?: string;
     pickupTime?: string;
     isLocal?: boolean;
     localPackage?: string;
+    isPackage?: boolean;
+    tripDays?: number;
 }
 
-export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime, isLocal, localPackage }: CarCardProps) {
+export default function CarCard({ car, source, destination, tripType, pickupDate, dropDate, pickupTime, isLocal, localPackage, isPackage, tripDays }: CarCardProps) {
     const [showPlanningModal, setShowPlanningModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [showPersonaPicker, setShowPersonaPicker] = useState(false);
@@ -156,7 +158,10 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                                     {formatCurrency(currentPrice)}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                    for {tripType === 'round-trip' ? 'round trip' : 'one way'}
+                                    for {tripType === 'round-trip' ? 'round trip'
+                                        : tripType === 'local' ? 'local rental'
+                                            : (isPackage || tripType === 'package') ? `${tripDays ?? ''}-day package`
+                                                : 'one way'}
                                 </div>
                             </div>
 
@@ -203,6 +208,8 @@ export default function CarCard({ car, source, destination, tripType, pickupDate
                 persona={chosenPersona}
                 isLocal={isLocal}
                 localPackage={localPackage}
+                isPackage={isPackage}
+                tripDays={tripDays}
             />
 
             {/* Direct Booking Modal (without customization) */}

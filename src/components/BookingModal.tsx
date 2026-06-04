@@ -29,7 +29,7 @@ interface BookingModalProps {
     source: Location;
     destination: Location;
     car: Car;
-    tripType: 'one-way' | 'round-trip' | 'local';
+    tripType: 'one-way' | 'round-trip' | 'local' | 'package';
     tripStats: TripStats;
     selectedStops: Stop[];
     pickupDate: string;
@@ -64,6 +64,11 @@ export default function BookingModal({
     pickupTime,
 }: BookingModalProps) {
     const { showToast } = useToast();
+    const tripTypeLabel =
+        tripType === 'round-trip' ? 'Round Trip'
+            : tripType === 'local' ? 'Local Rental'
+                : tripType === 'package' ? 'Sightseeing Package'
+                    : 'One Way';
     const [currentStep, setCurrentStep] = useState<BookingStep>('details');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [bookingId, setBookingId] = useState<string | null>(null);
@@ -241,7 +246,7 @@ export default function BookingModal({
                                     <p className="text-sm text-blue-100">
                                         {currentStep === 'success'
                                             ? `Booking ID: ${bookingId}`
-                                            : `${car.name} • ${tripType === 'round-trip' ? 'Round Trip' : 'One Way'}`
+                                            : `${car.name} • ${tripTypeLabel}`
                                         }
                                     </p>
                                 </div>
@@ -486,7 +491,7 @@ export default function BookingModal({
                                             <div className="flex justify-between">
                                                 <span className="text-slate-500">Trip Type</span>
                                                 <span className="font-medium text-slate-800">
-                                                    {tripType === 'round-trip' ? 'Round Trip' : 'One Way'}
+                                                    {tripTypeLabel}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">

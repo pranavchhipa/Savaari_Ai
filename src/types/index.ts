@@ -34,6 +34,7 @@ export interface Stop {
   description?: string;
   detourKm?: number;
   leg?: 'onward' | 'return';
+  day?: number;              // 1-based day index for destination 'package' plans
   // Enhanced fields for tourist recommendations
   rating?: number;           // AI-estimated 1-5
   badges?: StopBadge[];
@@ -126,14 +127,17 @@ export interface RouteData {
   selectedRouteId?: string;
 }
 
+export type TripType = 'one-way' | 'round-trip' | 'local' | 'package';
+
 export interface SearchParams {
   source: Location | null;
   destination: Location | null;
   pickupDate: string;
   dropDate?: string;
   pickupTime?: string;
-  tripType: 'one-way' | 'round-trip' | 'local';
+  tripType: TripType;
   localPackage?: LocalPackage;
+  tripDays?: number;          // for destination 'package' trips
 }
 
 export type LocalPackage = '8hr_80km' | '12hr_120km';

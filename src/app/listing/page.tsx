@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { getDistance } from '@/lib/geoUtils';
 import { calculateTripStats } from '@/lib/calculateTripStats';
+import { computePackagePrice } from '@/lib/packagePricing';
 
 // Sample car data
 // Sample car data with FALLBACK prices (approx 300km Trip) to avoid ₹0 flash
@@ -125,11 +126,12 @@ export default function ListingPage() {
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
-    const [tripType, setTripType] = useState<'one-way' | 'round-trip' | 'local'>('round-trip');
+    const [tripType, setTripType] = useState<'one-way' | 'round-trip' | 'local' | 'package'>('round-trip');
     const [pickupDate, setPickupDate] = useState<string>('');
     const [dropDate, setDropDate] = useState<string>('');
     const [pickupTime, setPickupTime] = useState<string>('09:00');
     const [localPackage, setLocalPackage] = useState<LocalPackage>('8hr_80km');
+    const [tripDays, setTripDays] = useState<number>(3);
     const [filters, setFilters] = useState<FilterState>({
         carTypes: [],
         minSeats: 0,
@@ -139,13 +141,13 @@ export default function ListingPage() {
     // Save to sessionStorage when trip type or date changes
     useEffect(() => {
         if (!isLoading && searchParams) {
-            const updated = { ...searchParams, tripType, pickupDate, dropDate, pickupTime };
+            const updated = { ...searchParams, tripType, pickupDate, dropDate, pickupTime, tripDays };
             sessionStorage.setItem('savaari_search', JSON.stringify(updated));
         }
 
         // Also trigger re-calculation if tripType changes?
         // Ideally yes, but for now let's keep it simple.
-    }, [tripType, pickupDate, dropDate, pickupTime, isLoading, searchParams]);
+    }, [tripType, pickupDate, dropDate, pickupTime, tripDays, isLoading, searchParams]);
 
     const [cars, setCars] = useState<Car[]>(sampleCars);
     const [routeData, setRouteData] = useState<{ distanceKm: number, durationMinutes: number } | null>(null);
@@ -186,6 +188,7 @@ export default function ListingPage() {
                         if (params.pickupDate) setPickupDate(params.pickupDate);
                         if (params.dropDate) setDropDate(params.dropDate || '');
                         if (params.pickupTime) setPickupTime(params.pickupTime || '09:00');
+                        if (params.tripDays) setTripDays(params.tripDays);
                     } catch (e) {
                         console.error('Failed to parse search params');
                     }
@@ -271,6 +274,20 @@ export default function ListingPage() {
 
             if (!currentRouteData) return;
 
+            // Destination packages: transfer round-trip + N sightseeing days
+            if (tripType === 'package') {
+                const updatedCars = sampleCars.map(car => ({
+                    ...car,
+                    baseFare: computePackagePrice({
+                        transferKm: currentRouteData.distanceKm,
+                        numDays: tripDays,
+                        car,
+                    }).totalFare,
+                }));
+                setCars(updatedCars);
+                return;
+            }
+
             try {
                 // Now synchronous
                 const updatedCars = sampleCars.map(car => {
@@ -297,7 +314,7 @@ export default function ListingPage() {
         };
 
         calculatePrices();
-    }, [routeData, tripType, localPackage]);
+    }, [routeData, tripType, localPackage, tripDays]);
 
 
 
@@ -476,7 +493,16 @@ export default function ListingPage() {
                                 </AnimatePresence>
                             </div>
 
+                            {/* Package indicator (shown instead of the toggle for packages) */}
+                            {tripType === 'package' && (
+                                <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-[#2563EB] rounded-xl text-sm font-semibold">
+                                    <Calendar className="w-4 h-4" />
+                                    <span>{tripDays}-Day Package</span>
+                                </div>
+                            )}
+
                             {/* Trip Type Toggle - Professional Pill Style */}
+                            {tripType !== 'package' && (
                             <div className="flex items-center bg-gray-100 rounded-xl p-1">
                                 <button
                                     onClick={() => setTripType('one-way')}
@@ -499,6 +525,7 @@ export default function ListingPage() {
                                     <span className="hidden sm:inline">Round Trip</span>
                                 </button>
                             </div>
+                            )}
 
                             {/* Package Toggle - visible only for local trips */}
                             {tripType === 'local' && (
@@ -746,6 +773,8 @@ export default function ListingPage() {
                                     pickupTime={pickupTime}
                                     isLocal={tripType === 'local'}
                                     localPackage={localPackage}
+                                    isPackage={tripType === 'package'}
+                                    tripDays={tripDays}
                                 />
                             </motion.div>
                         ))

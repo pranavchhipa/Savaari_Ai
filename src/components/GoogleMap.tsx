@@ -13,7 +13,7 @@ interface GoogleMapProps {
     stops: Stop[];
     selectedStopId?: string;
     onStopClick?: (stopId: string) => void;
-    tripType: 'one-way' | 'round-trip' | 'local';
+    tripType: 'one-way' | 'round-trip' | 'local' | 'package';
     tripStats?: TripStats;
     perKmRate?: number;
 }

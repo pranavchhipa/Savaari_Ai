@@ -12,6 +12,8 @@ interface RecommendationShowcaseProps {
     dontMiss?: AIRecommendation[];
     onAddStop: (recommendation: AIRecommendation) => void;
     addedStopIds: Set<string>;
+    title?: string;
+    subtitle?: string;
 }
 
 const BADGE_CONFIG: Record<StopBadge, { label: string; color: string; bg: string; icon: string }> = {
@@ -153,6 +155,8 @@ export default function RecommendationShowcase({
     dontMiss,
     onAddStop,
     addedStopIds,
+    title,
+    subtitle,
 }: RecommendationShowcaseProps) {
     const [showAll, setShowAll] = useState(false);
     const [selectedRec, setSelectedRec] = useState<AIRecommendation | null>(null);
@@ -174,10 +178,10 @@ export default function RecommendationShowcase({
                         </div>
                         <div>
                             <h3 className="font-bold text-gray-800 text-sm">
-                                Sarathi Recommends
+                                {title || 'Sarathi Recommends'}
                             </h3>
                             <p className="text-[10px] text-gray-500">
-                                Tourist attractions along your route
+                                {subtitle || 'Tourist attractions along your route'}
                             </p>
                         </div>
                     </div>
