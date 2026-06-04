@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Package, Shield, IndianRupee, Headphones, ArrowRight } from 'lucide-react';
 import SearchWidget from '@/components/SearchWidget';
 import PackageCard from '@/components/PackageCard';
+import PackageDetailModal from '@/components/PackageDetailModal';
 import Logo from '@/components/Logo';
 import { getPackageById, TravelPackage } from '@/lib/packages';
 
@@ -28,6 +30,7 @@ const QUICK_ROUTES = [
 
 export default function Home() {
     const router = useRouter();
+    const [selected, setSelected] = useState<TravelPackage | null>(null);
     const featured = FEATURED_IDS.map(getPackageById).filter((p): p is TravelPackage => p !== null);
 
     const go = (from: string, to: string, tripType: 'one-way' | 'round-trip' | 'local') => {
@@ -52,8 +55,8 @@ export default function Home() {
                         alt=""
                         className="w-full h-full object-cover"
                     />
-                    {/* light gradient just for text legibility */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/15 to-black/45" />
+                    {/* gradient scrim for white-text legibility */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/65" />
                 </div>
 
                 <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
@@ -89,7 +92,7 @@ export default function Home() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {featured.map((p, i) => (
-                            <PackageCard key={p.id} pkg={p} index={i} onSelect={(pkg) => go(pkg.from, pkg.to, pkg.tripType)} />
+                            <PackageCard key={p.id} pkg={p} index={i} onSelect={setSelected} />
                         ))}
                     </div>
                 </div>
@@ -181,6 +184,15 @@ export default function Home() {
                     </div>
                 </div>
             </footer>
+
+            <PackageDetailModal
+                isOpen={!!selected}
+                pkg={selected}
+                source={cityLoc(selected?.from || 'Bangalore')}
+                destination={cityLoc(selected?.to || 'Mysore')}
+                pickupDate={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                onClose={() => setSelected(null)}
+            />
         </div>
     );
 }
