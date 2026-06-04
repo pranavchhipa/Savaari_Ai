@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type {
   Location,
   Car,
@@ -69,6 +69,7 @@ export function usePackagePlan({
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [transferKm, setTransferKm] = useState<number>(0);
   const [usedAi, setUsedAi] = useState(false);
+  const photoFetched = useRef<Set<string>>(new Set());
 
   const days = Math.max(1, Math.floor(numDays || 1));
 
@@ -195,6 +196,40 @@ export function usePackagePlan({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination?.name, destination?.lat, destination?.lng, persona, days]);
+
+  // Lazy-load real photos for each attraction via Places (New).
+  useEffect(() => {
+    if (attractions.length === 0 || !destination?.name) return;
+    let cancelled = false;
+    const pending = attractions.filter((a) => !a.photoUrl && !photoFetched.current.has(recKey(a)));
+    if (pending.length === 0) return;
+    pending.forEach((a) => photoFetched.current.add(recKey(a)));
+    (async () => {
+      await Promise.all(
+        pending.map(async (a) => {
+          try {
+            const res = await fetch('/api/google/place-photo', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: `${a.name}, ${destination.name}` }),
+            });
+            if (!res.ok) return;
+            const { photoUrl } = await res.json();
+            if (cancelled || !photoUrl) return;
+            const key = recKey(a);
+            setAttractions((prev) => prev.map((x) => (recKey(x) === key ? { ...x, photoUrl } : x)));
+            setStopByKey((prev) => {
+              const m = new Map(prev);
+              const s = m.get(key);
+              if (s) m.set(key, { ...s, photoUrl });
+              return m;
+            });
+          } catch { /* ignore */ }
+        }),
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [attractions, destination?.name]);
 
   // ---- Derived: selected stops → day plan ----
   const transferDriveHours = useMemo(
