@@ -48,7 +48,7 @@ export default function PackageCard({ pkg, onSelect, index = 0 }: PackageCardPro
             transition={{ delay: index * 0.06 }}
             whileHover={{ y: -6 }}
             onClick={() => onSelect(pkg)}
-            className="group text-left bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl hover:shadow-gray-300/50 border border-gray-100 transition-all duration-300 flex flex-col"
+            className="group text-left bg-white rounded-2xl overflow-hidden shadow-lg shadow-slate-300/40 hover:shadow-2xl hover:shadow-slate-400/40 border border-gray-100 transition-all duration-300 flex flex-col"
         >
             {/* Image */}
             <div className="relative h-48 overflow-hidden bg-gradient-to-br from-slate-200 to-slate-300">

@@ -41,7 +41,7 @@ export default function Home() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-slate-100">
             {/* HERO + SEARCH (on top) */}
             <section className="relative pt-6 pb-24 overflow-hidden bg-[#0F172A]">
                 {/* Scenic background (full opacity) */}

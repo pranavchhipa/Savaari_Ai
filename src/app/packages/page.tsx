@@ -52,7 +52,7 @@ export default function PackagesPage() {
         : `${TRIP_TYPE_LABEL[tripType]} packages to ${destCity.name}`;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+        <div className="min-h-screen bg-slate-100">
             {/* Sticky route header */}
             <div className="sticky top-16 z-40 bg-white border-b border-gray-100 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
