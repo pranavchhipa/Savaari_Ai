@@ -157,7 +157,7 @@ export default function SearchWidget() {
                                     initial={{ opacity: 0, width: 0 }}
                                     animate={{ opacity: 1, width: 'auto' }}
                                     exit={{ opacity: 0, width: 0 }}
-                                    className="flex flex-col md:flex-row items-stretch gap-0 overflow-hidden flex-1 min-w-0"
+                                    className="flex flex-col md:flex-row items-stretch gap-0 flex-1 min-w-0"
                                 >
                                     {/* Swap Button - Desktop */}
                                     <div className="hidden md:flex items-end justify-center px-2 pb-2">
