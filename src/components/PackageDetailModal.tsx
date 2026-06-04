@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { X, Check, Star, Users, Loader2, CreditCard } from 'lucide-react';
 import { Location, Car, Stop } from '@/types';
-import { TravelPackage, resolvePackageDay, packagePrice, packageHeroAttraction } from '@/lib/packages';
+import { TravelPackage, resolvePackageDay, packagePrice, packageHeroAttraction, PACKAGE_PERSONAS } from '@/lib/packages';
 import { sampleCars } from '@/lib/cars';
 import { formatCurrency, getStopTypeIcon } from '@/lib/calculateTripStats';
 import BookingModal from './BookingModal';
@@ -43,7 +44,6 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
 
     useEffect(() => { if (isOpen) setSelectedCar(sampleCars[0]); }, [isOpen, pkg]);
 
-    // Lazy-load photos (throttled to 3 at a time).
     useEffect(() => {
         if (!isOpen || !pkg || allAttractions.length === 0) return;
         let cancelled = false;
@@ -54,8 +54,7 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                 const a = items[idx++];
                 try {
                     const r = await fetch('/api/google/place-photo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ query: `${a.name}, ${pkg.to}` }),
                     });
                     if (r.ok) { const j = await r.json(); if (j.photoUrl && !cancelled) setPhotos((p) => ({ ...p, [a.id]: j.photoUrl })); }
@@ -69,10 +68,13 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
 
     if (!pkg) return null;
 
+    const persona = PACKAGE_PERSONAS[pkg.persona];
     const stats = packagePrice(pkg, selectedCar);
     const hero = packageHeroAttraction(pkg);
     const heroPhoto = hero ? photos[hero.id] : undefined;
-    const durLabel = pkg.nights > 0 ? `${pkg.durationDays}D / ${pkg.nights}N` : 'Day Trip';
+    const isLocal = pkg.tripType === 'local';
+    const durLabel = isLocal ? 'Day Trip' : pkg.nights > 0 ? `${pkg.durationDays}D / ${pkg.nights}N` : '1 Day';
+    const routeLabel = isLocal ? source.name : `${source.name} → ${destination.name}`;
 
     const mapStops: Stop[] = allAttractions.map((a) => ({
         id: a.id, name: a.name, type: a.type,
@@ -96,7 +98,6 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                             className="fixed inset-0 z-50 flex flex-col bg-white md:inset-4 md:rounded-2xl md:shadow-2xl md:m-auto md:max-w-5xl md:max-h-[95vh]"
                         >
-                            {/* Hero header */}
                             <div className="relative h-40 flex-shrink-0 bg-slate-300 md:rounded-t-2xl overflow-hidden">
                                 {heroPhoto ? (
                                     // eslint-disable-next-line @next/next/no-img-element
@@ -108,18 +109,17 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                 <button onClick={onClose} className="absolute top-3 right-3 p-2 bg-black/30 hover:bg-black/50 rounded-lg text-white"><X className="w-5 h-5" /></button>
                                 <div className="absolute bottom-3 left-4 right-4 text-white">
                                     <div className="flex items-center gap-2 text-xs mb-1.5">
-                                        <span className="bg-white/25 px-2 py-0.5 rounded-full">{pkg.theme}</span>
+                                        <span className={`px-2 py-0.5 rounded-full ${persona.chip}`}>{persona.emoji} {persona.label}</span>
                                         <span className="bg-white/25 px-2 py-0.5 rounded-full">{durLabel}</span>
-                                        <span>{source.name} → {destination.name}</span>
+                                        <span>{routeLabel}</span>
                                     </div>
                                     <h2 className="text-2xl font-bold drop-shadow">{pkg.title}</h2>
                                 </div>
                             </div>
 
-                            {/* Body */}
                             <div className="flex-1 overflow-y-auto">
                                 <div className="p-4 md:p-6">
-                                    <p className="text-gray-600 text-sm">{pkg.summary}</p>
+                                    <p className="text-gray-600 text-sm">{pkg.tagline}</p>
 
                                     <div className="flex flex-col lg:flex-row gap-6 mt-5">
                                         <div className="lg:w-3/5 space-y-4">
@@ -128,8 +128,8 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                                 <div key={d.day} className="rounded-xl border border-gray-200 overflow-hidden">
                                                     <div className="bg-slate-50 px-4 py-2 flex items-center gap-2 border-b border-gray-100">
                                                         <span className="w-6 h-6 rounded-full bg-[#2563EB] text-white text-xs font-bold flex items-center justify-center">{d.day}</span>
-                                                        <span className="font-semibold text-sm text-gray-800">Day {d.day}</span>
-                                                        <span className="text-gray-400 text-xs">· {d.title}</span>
+                                                        <span className="font-semibold text-sm text-gray-800">{isLocal ? d.title : `Day ${d.day}`}</span>
+                                                        {!isLocal && <span className="text-gray-400 text-xs">· {d.title}</span>}
                                                     </div>
                                                     <div className="divide-y divide-gray-50">
                                                         {d.attractions.map((a) => (
@@ -185,6 +185,9 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                                 return (
                                                     <button key={car.id} onClick={() => setSelectedCar(car)} className={`text-left p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${sel ? 'border-[#2563EB] bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
                                                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sel ? 'border-[#2563EB] bg-[#2563EB]' : 'border-gray-300'}`}>{sel && <Check className="w-3 h-3 text-white" />}</div>
+                                                        <div className="relative w-16 h-11 flex-shrink-0">
+                                                            <Image src={car.image} alt={car.name} fill className="object-contain" sizes="64px" />
+                                                        </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="font-semibold text-sm text-gray-800 truncate">{car.name}</div>
                                                             <div className="text-[11px] text-gray-500 flex items-center gap-2">
@@ -202,7 +205,6 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                 </div>
                             </div>
 
-                            {/* Sticky footer */}
                             <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center justify-between gap-4">
                                 <div>
                                     <div className="text-xs text-gray-500">{selectedCar.name} · {durLabel} · all-in</div>

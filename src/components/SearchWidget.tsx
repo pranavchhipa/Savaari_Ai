@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Location } from '@/types';
 import GooglePlacesAutocomplete from './GooglePlacesAutocomplete';
 
-type TripTab = 'one-way' | 'round-trip' | 'local' | 'package';
+type TripTab = 'one-way' | 'round-trip' | 'local';
 
 export default function SearchWidget() {
     const router = useRouter();
@@ -19,7 +19,6 @@ export default function SearchWidget() {
     const [dropDate, setDropDate] = useState('');
     const [pickupTime, setPickupTime] = useState('07:00');
     const [tripTab, setTripTab] = useState<TripTab>('one-way');
-    const [tripDays, setTripDays] = useState(3);
     const [isLoading, setIsLoading] = useState(false);
 
     // Set default dates
@@ -82,10 +81,9 @@ export default function SearchWidget() {
             tripType: tripTab,
             dropDate: tripTab === 'round-trip' ? dropDate : undefined,
             pickupTime,
-            tripDays: tripTab === 'package' ? tripDays : undefined,
         };
         sessionStorage.setItem('savaari_search', JSON.stringify(searchParams));
-        router.push(tripTab === 'package' ? '/packages' : '/listing');
+        router.push('/packages');
     };
 
     // Generate time options
@@ -111,7 +109,7 @@ export default function SearchWidget() {
             {/* Compact Trip Type Toggle */}
             <div className="flex justify-center mb-0">
                 <div className="inline-flex bg-white rounded-t-2xl overflow-hidden border border-gray-200/60 border-b-0 shadow-sm">
-                    {(['one-way', 'round-trip', 'local', 'package'] as TripTab[]).map((tab) => (
+                    {(['one-way', 'round-trip', 'local'] as TripTab[]).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setTripTab(tab)}
@@ -120,7 +118,7 @@ export default function SearchWidget() {
                                     : 'text-gray-400 hover:text-gray-600'
                                 }`}
                         >
-                            {tab === 'one-way' ? 'One Way' : tab === 'round-trip' ? 'Round Trip' : tab === 'local' ? 'Local' : 'Packages'}
+                            {tab === 'one-way' ? 'One Way' : tab === 'round-trip' ? 'Round Trip' : 'Local'}
                             {tripTab === tab && (
                                 <motion.div
                                     layoutId="activeTab"
@@ -251,32 +249,6 @@ export default function SearchWidget() {
                             )}
                         </AnimatePresence>
 
-                        {/* TRIP DURATION (Packages only) */}
-                        {tripTab === 'package' && (
-                            <div className="flex-1 min-w-0 w-full">
-                                <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                                    Trip Duration
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#2563EB]/60">
-                                        <Calendar className="w-4 h-4" />
-                                    </div>
-                                    <select
-                                        value={tripDays}
-                                        onChange={(e) => setTripDays(Number(e.target.value))}
-                                        className="w-full pl-10 pr-8 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15 focus:border-[#2563EB]/40 focus:bg-white transition-all cursor-pointer appearance-none"
-                                    >
-                                        {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                                            <option key={d} value={d}>{d} {d > 1 ? 'Days' : 'Day'}</option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-300">
-                                        <ChevronDown className="w-4 h-4" />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {/* PICK UP TIME */}
                         <div className="flex-1 min-w-0 w-full">
                             <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
@@ -323,7 +295,7 @@ export default function SearchWidget() {
                                 ) : (
                                     <Search className="w-4 h-4" />
                                 )}
-                                <span>{isLoading ? 'Searching...' : 'Explore Cabs'}</span>
+                                <span>{isLoading ? 'Searching...' : 'Explore Packages'}</span>
                             </motion.button>
                         </div>
                     </div>

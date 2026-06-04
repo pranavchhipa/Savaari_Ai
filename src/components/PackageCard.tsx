@@ -5,20 +5,13 @@ import { motion } from 'framer-motion';
 import { Star, Clock, MapPin, ArrowRight } from 'lucide-react';
 import {
     TravelPackage,
-    PackageTheme,
+    PACKAGE_PERSONAS,
     packageHeroAttraction,
     packageAttractionCount,
     packageAvgRating,
     packagePriceFrom,
 } from '@/lib/packages';
 import { formatCurrency } from '@/lib/calculateTripStats';
-
-const THEME_STYLE: Record<PackageTheme, { chip: string; emoji: string }> = {
-    Express: { chip: 'bg-amber-100 text-amber-700', emoji: '⚡' },
-    Heritage: { chip: 'bg-orange-100 text-orange-700', emoji: '🏛️' },
-    Family: { chip: 'bg-emerald-100 text-emerald-700', emoji: '👨‍👩‍👧' },
-    Nature: { chip: 'bg-green-100 text-green-700', emoji: '🌿' },
-};
 
 interface PackageCardProps {
     pkg: TravelPackage;
@@ -44,11 +37,11 @@ export default function PackageCard({ pkg, onSelect, index = 0 }: PackageCardPro
         return () => { cancelled = true; };
     }, [pkg]);
 
+    const persona = PACKAGE_PERSONAS[pkg.persona];
     const count = packageAttractionCount(pkg);
     const rating = packageAvgRating(pkg);
     const from = packagePriceFrom(pkg);
-    const theme = THEME_STYLE[pkg.theme];
-    const durLabel = pkg.nights > 0 ? `${pkg.durationDays}D / ${pkg.nights}N` : 'Day Trip';
+    const durLabel = pkg.tripType === 'local' ? 'Day Trip' : pkg.nights > 0 ? `${pkg.durationDays}D / ${pkg.nights}N` : '1 Day';
 
     return (
         <motion.button
@@ -64,10 +57,10 @@ export default function PackageCard({ pkg, onSelect, index = 0 }: PackageCardPro
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={photo} alt={pkg.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-5xl">{theme.emoji}</div>
+                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-5xl">{persona.emoji}</div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                <span className={`absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${theme.chip}`}>{theme.emoji} {pkg.theme}</span>
+                <span className={`absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${persona.chip}`}>{persona.emoji} {persona.label}</span>
                 <span className="absolute bottom-3 left-3 text-xs font-bold text-white bg-black/40 backdrop-blur px-2.5 py-1 rounded-full">{durLabel}</span>
                 <span className="absolute bottom-3 right-3 flex items-center gap-1 text-xs font-bold text-white bg-black/40 backdrop-blur px-2 py-1 rounded-full">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400" />{rating}
@@ -76,12 +69,7 @@ export default function PackageCard({ pkg, onSelect, index = 0 }: PackageCardPro
 
             <div className="p-4 flex flex-col flex-1">
                 <h3 className="font-bold text-gray-900 text-lg leading-tight">{pkg.title}</h3>
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{pkg.summary}</p>
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                    {pkg.tags.slice(0, 3).map((t) => (
-                        <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{t}</span>
-                    ))}
-                </div>
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{pkg.tagline}</p>
                 <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{count} stops</span>
                     <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{pkg.durationDays} {pkg.durationDays > 1 ? 'days' : 'day'}</span>
