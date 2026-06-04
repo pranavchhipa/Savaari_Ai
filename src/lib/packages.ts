@@ -290,3 +290,135 @@ export function getPackageById(id: string): TravelPackage | null {
 export function allPackages(): TravelPackage[] {
     return PACKAGES;
 }
+
+// ===== Editorial content shown on the package detail page =====
+export interface PackageContent {
+    overview: string;
+    highlights: string[];
+    goodToKnow: string[];
+}
+
+const GK_ONEWAY = [
+    "Early ~7 AM start keeps the stops unhurried",
+    "Dropped at your Mysore address — this is a one-way trip, no return",
+    "Monument entry tickets are paid directly at each spot",
+];
+const GK_RT = [
+    "The cab stays with you for the whole trip — sightsee at your own pace",
+    "Stay at the hotel of your choice (accommodation not included)",
+    "Reorder or skip stops anytime with your driver",
+];
+const GK_LOCAL = [
+    "8 hours / 80 km within city limits, start any time you like",
+    "Extra hours or kilometres are billed as per the standard slab",
+    "Monument entry tickets are paid directly at each spot",
+];
+
+const PACKAGE_CONTENT: Record<string, PackageContent> = {
+    // ---- One Way: Bangalore -> Mysore ----
+    "ow-blr-mys-family": {
+        overview: "A feel-good drive down the Mysore highway that the whole family will love. Break the journey at Channapatna to watch artisans turn wood into bright lacquered toys, then roll into Mysore for its grand palace, one of India's oldest zoos and the musical fountain at Brindavan Gardens. Easy pace, plenty for the kids, and you're dropped right at your Mysore stay.",
+        highlights: ["Toy-making stop at Channapatna", "Grand Mysore Palace visit", "Animals galore at Mysore Zoo", "Musical fountain finale at Brindavan Gardens"],
+        goodToKnow: GK_ONEWAY,
+    },
+    "ow-blr-mys-romantic": {
+        overview: "A romantic one-way escape that ends on a high — golden hour by the fountains. Pause at Tipu's island-fortress of Srirangapatna, take in the regal Mysore Palace, climb Chamundi Hills for sweeping views, and finish with the illuminated musical fountain at Brindavan Gardens as the sun goes down.",
+        highlights: ["Island fort of Srirangapatna", "Regal Mysore Palace", "Hilltop views from Chamundi", "Sunset fountain show for two"],
+        goodToKnow: GK_ONEWAY,
+    },
+    "ow-blr-mys-solo": {
+        overview: "A history-rich run to Mysore at your own rhythm. Start with Tipu Sultan's fortress town of Srirangapatna, dive into the Wadiyar legacy at Mysore Palace, admire original Raja Ravi Varma works at the Jaganmohan gallery, and round off with the climb to Chamundi Hills.",
+        highlights: ["Tipu Sultan's Srirangapatna", "Wadiyar-era Mysore Palace", "Raja Ravi Varma art gallery", "Chamundi Hills temple & views"],
+        goodToKnow: GK_ONEWAY,
+    },
+    "ow-blr-mys-friends": {
+        overview: "A fun one-way road trip with a cinematic detour. Strike a pose among the granite boulders of Ramanagara where Sholay was filmed, then hit Mysore for its palace, the Chamundi Hills climb and the crowd-pleasing musical fountain after dark.",
+        highlights: ["Sholay rocks photo-op at Ramanagara", "Iconic Mysore Palace", "Chamundi Hills panorama", "Evening musical fountain"],
+        goodToKnow: GK_ONEWAY,
+    },
+    "ow-blr-mys-express": {
+        overview: "Short on time? This no-fuss run heads straight for Mysore's three big-hitters — the palace, the Chamundi Hills viewpoint and the Brindavan musical fountain — and drops you at your destination. Maximum sights, minimum detours.",
+        highlights: ["Straight to Mysore Palace", "Chamundi Hills views", "Brindavan musical fountain", "No detours, all highlights"],
+        goodToKnow: GK_ONEWAY,
+    },
+    // ---- Round Trip: Bangalore <-> Mysore ----
+    "rt-blr-mys-family": {
+        overview: "Two relaxed days in Mysore with the cab at your disposal throughout. Day one is all easy fun — the zoo, the palace and the aviary at Karanji Lake; day two takes you up Chamundi Hills, through Brindavan Gardens and the vintage trains of the Rail Museum before heading home. No rushing, no rebooking.",
+        highlights: ["Mysore Zoo & Karanji Lake aviary", "Lit-up Mysore Palace", "Chamundi Hills + Brindavan Gardens", "Vintage trains at the Rail Museum"],
+        goodToKnow: GK_RT,
+    },
+    "rt-blr-mys-romantic": {
+        overview: "A two-day couple's retreat built around golden light and grand views. Spend the first day at the palace and the illuminated Brindavan Gardens, then wake early for the Chamundi Hills sunrise, a stop at the gleaming white Lalitha Mahal palace and the calm of Karanji Lake before the drive home.",
+        highlights: ["Illuminated Brindavan Gardens", "Royal Mysore Palace", "Sunrise from Chamundi Hills", "White Lalitha Mahal palace"],
+        goodToKnow: GK_RT,
+    },
+    "rt-blr-mys-solo": {
+        overview: "An unhurried two-day wander through Mysore's royal and cultural side. Explore the palace, the Jaganmohan art gallery and the century-old Devaraja Market on day one; on day two soak up Chamundi Hills, St Philomena's Cathedral and the Brindavan fountains before returning.",
+        highlights: ["Mysore Palace & art gallery", "100-year-old Devaraja Market", "Neo-Gothic St Philomena's", "Chamundi Hills & Brindavan"],
+        goodToKnow: GK_RT,
+    },
+    "rt-blr-mys-friends": {
+        overview: "A lively two-day loop with the squad and your own cab to roam. Cover the palace and Brindavan Gardens on day one, then chase forts and lakes on day two — Tipu's Srirangapatna, the Karanji aviary and the quirky Rail Museum — before the drive back to Bangalore.",
+        highlights: ["Mysore Palace & gardens", "Tipu's Srirangapatna fort", "Karanji Lake aviary", "Two days, cab on call"],
+        goodToKnow: GK_RT,
+    },
+    "rt-blr-mys-grand": {
+        overview: "The full royal experience, savoured over two relaxed days. Begin with the palace, the Jaganmohan gallery and the Brindavan fountains, then dedicate day two to Chamundi Hills, the Lalitha Mahal palace, Karanji Lake and St Philomena's Cathedral. Mysore, done properly.",
+        highlights: ["Palace + Jaganmohan gallery", "Brindavan musical fountain", "Chamundi Hills & Lalitha Mahal", "St Philomena's Cathedral"],
+        goodToKnow: GK_RT,
+    },
+    // ---- Local: Bangalore ----
+    "lo-blr-family": {
+        overview: "A full day showing the kids the best of Bengaluru. Start with a big-cat jeep safari at Bannerghatta, breathe in the greenery and glass house of Lalbagh, and finish at the Tudor-style Bangalore Palace. Comfortable, shaded and endlessly entertaining.",
+        highlights: ["Big-cat safari at Bannerghatta", "Glass House at Lalbagh", "Tudor-style Bangalore Palace", "Easy, family-friendly pace"],
+        goodToKnow: GK_LOCAL,
+    },
+    "lo-blr-romantic": {
+        overview: "A laid-back day for two through the city's leafiest corners, timed for a sunset finish. Stroll Lalbagh's botanical paths and the shaded avenues of Cubbon Park, then drive up to Nandi Hills for golden-hour views above the clouds.",
+        highlights: ["Botanical Lalbagh stroll", "Green calm of Cubbon Park", "Sunset atop Nandi Hills", "Relaxed, scenic pace"],
+        goodToKnow: GK_LOCAL,
+    },
+    "lo-blr-solo": {
+        overview: "A day tracing Bengaluru's landmarks at your own pace. Take in the Tudor Bangalore Palace, the granite grandeur of Vidhana Soudha, the serene hilltop ISKCON temple and the green heart of Cubbon Park — history, architecture and calm in one loop.",
+        highlights: ["Tudor Bangalore Palace", "Iconic Vidhana Soudha", "Hilltop ISKCON temple", "Leafy Cubbon Park"],
+        goodToKnow: GK_LOCAL,
+    },
+    "lo-blr-friends": {
+        overview: "A high-energy day with the gang, bookended by Nandi Hills at dawn. Catch sunrise above the clouds, wind down in Cubbon Park, browse Commercial Street and UB City, and end at the historic Bull Temple. City buzz, sorted.",
+        highlights: ["Sunrise at Nandi Hills", "Cubbon Park chill", "Shopping on Commercial Street", "Historic Bull Temple"],
+        goodToKnow: GK_LOCAL,
+    },
+    // ---- Local: Mysore ----
+    "lo-mys-family": {
+        overview: "A day built for families in the heart of Mysuru. Meet the animals at one of India's oldest zoos, spot birds at the Karanji Lake aviary, climb aboard vintage trains at the Rail Museum and end at the magnificent Mysore Palace.",
+        highlights: ["One of India's oldest zoos", "Karanji Lake walk-through aviary", "Vintage trains at Rail Museum", "Grand Mysore Palace"],
+        goodToKnow: GK_LOCAL,
+    },
+    "lo-mys-romantic": {
+        overview: "A gentle, scenic day for two around Mysuru. Watch the musical fountain dance at Brindavan Gardens, climb Chamundi Hills for the city panorama, and pause at the gleaming white Lalitha Mahal palace for high tea and photos.",
+        highlights: ["Musical fountain at Brindavan", "Chamundi Hills panorama", "White Lalitha Mahal palace", "Slow, romantic pace"],
+        goodToKnow: GK_LOCAL,
+    },
+    "lo-mys-solo": {
+        overview: "A culture-soaked day across royal Mysuru. Tour the opulent palace, admire Raja Ravi Varma masterpieces at the Jaganmohan gallery, wander the century-old Devaraja Market and finish at the neo-Gothic St Philomena's Cathedral.",
+        highlights: ["Opulent Mysore Palace", "Jaganmohan art gallery", "Bustling Devaraja Market", "St Philomena's Cathedral"],
+        goodToKnow: GK_LOCAL,
+    },
+    "lo-mys-friends": {
+        overview: "A full, fun day around Mysuru with the crew. Start with the Chamundi Hills climb, cool off at Brindavan Gardens, meet the animals at the zoo and catch the aviary at Karanji Lake — views, gardens and good times.",
+        highlights: ["Chamundi Hills views", "Brindavan Gardens fountain", "Mysore Zoo", "Karanji Lake aviary"],
+        goodToKnow: GK_LOCAL,
+    },
+};
+
+export function getPackageContent(pkg: TravelPackage): PackageContent {
+    const c = PACKAGE_CONTENT[pkg.id];
+    if (c) return c;
+    const gk = pkg.tripType === 'local' ? GK_LOCAL : pkg.tripType === 'round-trip' ? GK_RT : GK_ONEWAY;
+    const places = pkg.days.flatMap(resolvePackageDay);
+    return {
+        overview: pkg.tagline,
+        highlights: places.slice(0, 4).map((p) => p.name),
+        goodToKnow: gk,
+    };
+}

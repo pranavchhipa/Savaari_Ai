@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { X, Check, Star, Users, Loader2, CreditCard } from 'lucide-react';
+import { X, Check, Star, Users, Loader2, CreditCard, Clock, MapPin, Route, Sparkles, Info } from 'lucide-react';
 import { Location, Car, Stop } from '@/types';
-import { TravelPackage, resolvePackageDay, packagePrice, packageHeroAttraction, PACKAGE_PERSONAS } from '@/lib/packages';
+import { TravelPackage, resolvePackageDay, packagePrice, packageHeroAttraction, PACKAGE_PERSONAS, getPackageContent } from '@/lib/packages';
 import { sampleCars } from '@/lib/cars';
 import { formatCurrency, getStopTypeIcon } from '@/lib/calculateTripStats';
 import BookingModal from './BookingModal';
@@ -75,6 +75,15 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
     const isLocal = pkg.tripType === 'local';
     const durLabel = isLocal ? 'Day Trip' : pkg.nights > 0 ? `${pkg.durationDays}D / ${pkg.nights}N` : '1 Day';
     const routeLabel = isLocal ? source.name : `${source.name} → ${destination.name}`;
+    const content = getPackageContent(pkg);
+    const facts = [
+        { icon: Clock, label: 'Duration', value: durLabel },
+        { icon: MapPin, label: 'Stops', value: `${allAttractions.length} places` },
+        isLocal
+            ? { icon: Route, label: 'Coverage', value: '80 km · 8 hr' }
+            : { icon: Route, label: 'Distance', value: pkg.tripType === 'round-trip' ? `~${pkg.transferKm * 2} km round` : `~${pkg.transferKm} km one-way` },
+        { icon: Sparkles, label: 'Best for', value: persona.label },
+    ];
 
     const mapStops: Stop[] = allAttractions.map((a) => ({
         id: a.id, name: a.name, type: a.type,
@@ -119,9 +128,41 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
 
                             <div className="flex-1 overflow-y-auto">
                                 <div className="p-4 md:p-6">
-                                    <p className="text-gray-600 text-sm">{pkg.tagline}</p>
+                                    <p className="text-gray-700 text-base leading-relaxed">{pkg.tagline}</p>
 
-                                    <div className="flex flex-col lg:flex-row gap-6 mt-5">
+                                    {/* Trip snapshot */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                                        {facts.map((f) => (
+                                            <div key={f.label} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-slate-50 px-3 py-2.5">
+                                                <f.icon className="w-4 h-4 text-[#2563EB] flex-shrink-0" />
+                                                <div className="min-w-0">
+                                                    <div className="text-[10px] uppercase tracking-wide text-gray-400">{f.label}</div>
+                                                    <div className="text-xs font-semibold text-gray-800 truncate">{f.value}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* About this trip */}
+                                    <div className="mt-6">
+                                        <h3 className="font-bold text-gray-900 mb-1.5">About this trip</h3>
+                                        <p className="text-sm text-gray-600 leading-relaxed">{content.overview}</p>
+                                    </div>
+
+                                    {/* Trip highlights */}
+                                    <div className="mt-5">
+                                        <h3 className="font-bold text-gray-900 mb-2.5">Trip highlights</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {content.highlights.map((h) => (
+                                                <div key={h} className="flex items-start gap-2 text-sm text-gray-700 rounded-lg bg-amber-50/60 border border-amber-100 px-3 py-2">
+                                                    <Sparkles className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                                    <span className="leading-snug">{h}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col lg:flex-row gap-6 mt-6">
                                         <div className="lg:w-3/5 space-y-4">
                                             <h3 className="font-bold text-gray-900">Your itinerary</h3>
                                             {days.map((d) => (
@@ -133,21 +174,22 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                                     </div>
                                                     <div className="divide-y divide-gray-50">
                                                         {d.attractions.map((a) => (
-                                                            <div key={a.id} className="flex gap-3 items-center p-3">
+                                                            <div key={a.id} className="flex gap-3 items-start p-3">
                                                                 {photos[a.id] ? (
                                                                     // eslint-disable-next-line @next/next/no-img-element
-                                                                    <img src={photos[a.id]} alt={a.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                                                                    <img src={photos[a.id]} alt={a.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
                                                                 ) : (
-                                                                    <div className="w-14 h-14 rounded-lg bg-blue-50 flex items-center justify-center text-xl flex-shrink-0">{getStopTypeIcon(a.type)}</div>
+                                                                    <div className="w-16 h-16 rounded-lg bg-blue-50 flex items-center justify-center text-2xl flex-shrink-0">{getStopTypeIcon(a.type)}</div>
                                                                 )}
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <span className="font-semibold text-sm text-gray-800 truncate">{a.name}</span>
+                                                                        <span className="font-semibold text-sm text-gray-800">{a.name}</span>
                                                                         {typeof a.rating === 'number' && (
                                                                             <span className="flex items-center gap-0.5 text-amber-500 text-xs flex-shrink-0"><Star className="w-3 h-3 fill-current" />{a.rating.toFixed(1)}</span>
                                                                         )}
                                                                     </div>
-                                                                    <div className="text-[11px] text-gray-500 line-clamp-1">{a.suggestedDuration} min · {a.famousFor || a.description}</div>
+                                                                    <div className="text-[11px] font-medium text-[#2563EB]/80 mt-0.5">{a.suggestedDuration} min · {a.famousFor}</div>
+                                                                    <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">{a.description}</p>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -168,6 +210,14 @@ export default function PackageDetailModal({ isOpen, pkg, source, destination, p
                                                         <li key={x} className="flex items-start gap-1.5 text-xs text-gray-500"><X className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />{x}</li>
                                                     ))}</ul>
                                                 </div>
+                                            </div>
+
+                                            {/* Good to know */}
+                                            <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+                                                <h4 className="text-xs font-bold text-blue-800 mb-2 flex items-center gap-1.5"><Info className="w-3.5 h-3.5" />Good to know</h4>
+                                                <ul className="space-y-1.5">{content.goodToKnow.map((x) => (
+                                                    <li key={x} className="flex items-start gap-1.5 text-xs text-gray-600"><span className="text-blue-400 leading-none mt-0.5">•</span>{x}</li>
+                                                ))}</ul>
                                             </div>
                                         </div>
 
