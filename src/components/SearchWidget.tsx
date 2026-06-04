@@ -72,7 +72,7 @@ export default function SearchWidget() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }}
             className="w-full max-w-4xl mx-auto"
         >
-            <div className="bg-white rounded-[28px] shadow-2xl shadow-black/40 p-4 md:p-5">
+            <div className="relative bg-white rounded-[28px] shadow-2xl shadow-black/40 px-4 md:px-5 pt-4 md:pt-5 pb-10">
                 {/* Segmented tabs */}
                 <div className="flex justify-center mb-4">
                     <div className="inline-flex bg-gray-100 rounded-full p-1">
@@ -158,19 +158,14 @@ export default function SearchWidget() {
 
                 </div>
 
-                {/* Explore button — full-width bar */}
+                {/* Explore button — compact, straddles the card's bottom edge */}
                 <motion.button
-                    whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={handleSubmit} disabled={isLoading}
-                    className="w-full mt-4 px-8 py-3.5 bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#FB923C] hover:to-[#F97316] text-white rounded-xl font-bold text-base tracking-wide shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={handleSubmit} disabled={isLoading}
+                    className="absolute left-1/2 -translate-x-1/2 -bottom-6 px-12 md:px-16 py-3.5 bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#FB923C] hover:to-[#F97316] text-white rounded-xl font-bold text-base tracking-wide shadow-xl shadow-orange-500/40 transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-70"
                 >
                     {isLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Search className="w-5 h-5" />}
                     <span>{isLoading ? 'Searching...' : 'Explore Packages'}</span>
                 </motion.button>
-
-                {/* Trust strip */}
-                <div className="text-center text-xs text-gray-400 mt-4">
-                    Curated packages · Handpicked stops · Transparent all-inclusive pricing
-                </div>
             </div>
         </motion.div>
     );
