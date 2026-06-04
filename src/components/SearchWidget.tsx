@@ -85,7 +85,7 @@ export default function SearchWidget() {
             tripDays: tripTab === 'package' ? tripDays : undefined,
         };
         sessionStorage.setItem('savaari_search', JSON.stringify(searchParams));
-        router.push('/listing');
+        router.push(tripTab === 'package' ? '/packages' : '/listing');
     };
 
     // Generate time options
