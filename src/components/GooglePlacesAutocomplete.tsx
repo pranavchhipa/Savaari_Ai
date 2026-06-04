@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, X, Loader2, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { MapPin, X, Search } from 'lucide-react';
 import { Location } from '@/types';
 
 interface GooglePlacesAutocompleteProps {
@@ -12,56 +12,76 @@ interface GooglePlacesAutocompleteProps {
     iconColor?: string;
 }
 
-// Load Google Maps script once
-let scriptLoaded = false;
-let scriptLoading = false;
-const loadCallbacks: (() => void)[] = [];
+// Built-in Indian city dataset with coordinates.
+// The project's Google key has the Geocoding API / legacy Places Autocomplete
+// disabled (REQUEST_DENIED), so for this prototype we resolve cities locally —
+// instant, no API dependency, always works. Covers metros + popular getaways.
+interface City { name: string; state: string; lat: number; lng: number; alt?: string }
 
-function loadGoogleMapsScript(apiKey: string): Promise<void> {
-    return new Promise((resolve) => {
-        // Check if already loaded (e.g. by @vis.gl/react-google-maps APIProvider)
-        if (window.google?.maps?.places) {
-            scriptLoaded = true;
-            resolve();
-            return;
+const CITIES: City[] = [
+    { name: 'Bangalore', state: 'Karnataka', lat: 12.9716, lng: 77.5946, alt: 'bengaluru' },
+    { name: 'Mysore', state: 'Karnataka', lat: 12.2958, lng: 76.6394, alt: 'mysuru' },
+    { name: 'Chennai', state: 'Tamil Nadu', lat: 13.0827, lng: 80.2707 },
+    { name: 'Hyderabad', state: 'Telangana', lat: 17.3850, lng: 78.4867 },
+    { name: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lng: 72.8777 },
+    { name: 'Pune', state: 'Maharashtra', lat: 18.5204, lng: 73.8567 },
+    { name: 'Delhi', state: 'Delhi', lat: 28.6139, lng: 77.2090, alt: 'new delhi' },
+    { name: 'Gurgaon', state: 'Haryana', lat: 28.4595, lng: 77.0266, alt: 'gurugram' },
+    { name: 'Noida', state: 'Uttar Pradesh', lat: 28.5355, lng: 77.3910 },
+    { name: 'Jaipur', state: 'Rajasthan', lat: 26.9124, lng: 75.7873 },
+    { name: 'Udaipur', state: 'Rajasthan', lat: 24.5854, lng: 73.7125 },
+    { name: 'Jodhpur', state: 'Rajasthan', lat: 26.2389, lng: 73.0243 },
+    { name: 'Agra', state: 'Uttar Pradesh', lat: 27.1767, lng: 78.0081 },
+    { name: 'Goa', state: 'Goa', lat: 15.2993, lng: 74.1240, alt: 'panaji panjim' },
+    { name: 'Ooty', state: 'Tamil Nadu', lat: 11.4102, lng: 76.6950, alt: 'udagamandalam' },
+    { name: 'Coorg', state: 'Karnataka', lat: 12.4244, lng: 75.7382, alt: 'madikeri kodagu' },
+    { name: 'Chikmagalur', state: 'Karnataka', lat: 13.3161, lng: 75.7720 },
+    { name: 'Hampi', state: 'Karnataka', lat: 15.3350, lng: 76.4600 },
+    { name: 'Mangalore', state: 'Karnataka', lat: 12.9141, lng: 74.8560 },
+    { name: 'Gokarna', state: 'Karnataka', lat: 14.5479, lng: 74.3188 },
+    { name: 'Kochi', state: 'Kerala', lat: 9.9312, lng: 76.2673, alt: 'cochin' },
+    { name: 'Munnar', state: 'Kerala', lat: 10.0889, lng: 77.0595 },
+    { name: 'Wayanad', state: 'Kerala', lat: 11.6854, lng: 76.1320 },
+    { name: 'Pondicherry', state: 'Puducherry', lat: 11.9416, lng: 79.8083, alt: 'puducherry' },
+    { name: 'Coimbatore', state: 'Tamil Nadu', lat: 11.0168, lng: 76.9558 },
+    { name: 'Madurai', state: 'Tamil Nadu', lat: 9.9252, lng: 78.1198 },
+    { name: 'Kolkata', state: 'West Bengal', lat: 22.5726, lng: 88.3639 },
+    { name: 'Darjeeling', state: 'West Bengal', lat: 27.0360, lng: 88.2627 },
+    { name: 'Ahmedabad', state: 'Gujarat', lat: 23.0225, lng: 72.5714 },
+    { name: 'Surat', state: 'Gujarat', lat: 21.1702, lng: 72.8311 },
+    { name: 'Vadodara', state: 'Gujarat', lat: 22.3072, lng: 73.1812 },
+    { name: 'Lonavala', state: 'Maharashtra', lat: 18.7546, lng: 73.4062 },
+    { name: 'Mahabaleshwar', state: 'Maharashtra', lat: 17.9307, lng: 73.6477 },
+    { name: 'Nagpur', state: 'Maharashtra', lat: 21.1458, lng: 79.0882 },
+    { name: 'Indore', state: 'Madhya Pradesh', lat: 22.7196, lng: 75.8577 },
+    { name: 'Chandigarh', state: 'Chandigarh', lat: 30.7333, lng: 76.7794 },
+    { name: 'Shimla', state: 'Himachal Pradesh', lat: 31.1048, lng: 77.1734 },
+    { name: 'Manali', state: 'Himachal Pradesh', lat: 32.2396, lng: 77.1887 },
+    { name: 'Rishikesh', state: 'Uttarakhand', lat: 30.0869, lng: 78.2676 },
+    { name: 'Nainital', state: 'Uttarakhand', lat: 29.3919, lng: 79.4542 },
+    { name: 'Dehradun', state: 'Uttarakhand', lat: 30.3165, lng: 78.0322 },
+    { name: 'Amritsar', state: 'Punjab', lat: 31.6340, lng: 74.8723 },
+    { name: 'Varanasi', state: 'Uttar Pradesh', lat: 25.3176, lng: 82.9739 },
+    { name: 'Lucknow', state: 'Uttar Pradesh', lat: 26.8467, lng: 80.9462 },
+    { name: 'Visakhapatnam', state: 'Andhra Pradesh', lat: 17.6868, lng: 83.2185, alt: 'vizag' },
+    { name: 'Tirupati', state: 'Andhra Pradesh', lat: 13.6288, lng: 79.4192 },
+];
+
+function searchCities(query: string): City[] {
+    const q = query.trim().toLowerCase();
+    if (q.length < 1) return [];
+    const starts: City[] = [];
+    const contains: City[] = [];
+    for (const c of CITIES) {
+        const name = c.name.toLowerCase();
+        const alt = c.alt || '';
+        if (name.startsWith(q) || alt.split(' ').some((a) => a.startsWith(q))) {
+            starts.push(c);
+        } else if (name.includes(q) || alt.includes(q) || c.state.toLowerCase().includes(q)) {
+            contains.push(c);
         }
-
-        if (scriptLoaded) {
-            resolve();
-            return;
-        }
-
-        loadCallbacks.push(resolve);
-
-        if (scriptLoading) return;
-        scriptLoading = true;
-
-        // Check if a Google Maps script tag already exists in the DOM
-        const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
-        if (existingScript) {
-            // Script exists but hasn't loaded yet — wait for it
-            const checkReady = setInterval(() => {
-                if (window.google?.maps?.places) {
-                    clearInterval(checkReady);
-                    scriptLoaded = true;
-                    loadCallbacks.forEach(cb => cb());
-                    loadCallbacks.length = 0;
-                }
-            }, 100);
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-            scriptLoaded = true;
-            loadCallbacks.forEach(cb => cb());
-            loadCallbacks.length = 0;
-        };
-        document.head.appendChild(script);
-    });
+    }
+    return [...starts, ...contains].slice(0, 6);
 }
 
 export default function GooglePlacesAutocomplete({
@@ -72,35 +92,14 @@ export default function GooglePlacesAutocomplete({
     iconColor = '#2563EB',
 }: GooglePlacesAutocompleteProps) {
     const [inputValue, setInputValue] = useState(defaultValue);
-    const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+    const [matches, setMatches] = useState<City[]>([]);
     const [isOpen, setIsOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [apiReady, setApiReady] = useState(false);
-
-    const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
-    const placesService = useRef<google.maps.places.PlacesService | null>(null);
-    const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => {
-        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-        if (!apiKey) return;
-
-        loadGoogleMapsScript(apiKey).then(() => {
-            autocompleteService.current = new google.maps.places.AutocompleteService();
-            sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-            const dummyDiv = document.createElement('div');
-            placesService.current = new google.maps.places.PlacesService(dummyDiv);
-            setApiReady(true);
-        });
-    }, []);
 
     useEffect(() => {
         setInputValue(defaultValue);
     }, [defaultValue]);
 
-    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -111,74 +110,31 @@ export default function GooglePlacesAutocomplete({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const fetchPredictions = useCallback((value: string) => {
-        if (!autocompleteService.current || !sessionToken.current || value.length < 2) {
-            setPredictions([]);
-            setIsOpen(false);
-            return;
-        }
-
-        setIsLoading(true);
-        autocompleteService.current.getPlacePredictions(
-            {
-                input: value,
-                sessionToken: sessionToken.current,
-                componentRestrictions: { country: 'in' },
-                // types: ['(cities)'], // Removed to allow all place types (addresses, landmarks, etc.)
-            },
-            (results, status) => {
-                setIsLoading(false);
-                if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                    setPredictions(results);
-                    setIsOpen(true);
-                } else {
-                    setPredictions([]);
-                }
-            }
-        );
-    }, [apiReady]);
-
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setInputValue(value);
-
-        if (debounceTimer.current) clearTimeout(debounceTimer.current);
-        debounceTimer.current = setTimeout(() => fetchPredictions(value), 250);
+        const found = searchCities(value);
+        setMatches(found);
+        setIsOpen(found.length > 0);
     };
 
-    const handleSelect = (prediction: google.maps.places.AutocompletePrediction) => {
-        setInputValue(prediction.structured_formatting.main_text);
+    const select = (c: City) => {
+        setInputValue(c.name);
         setIsOpen(false);
-        setPredictions([]);
-
-        if (!placesService.current || !sessionToken.current) return;
-
-        placesService.current.getDetails(
-            {
-                placeId: prediction.place_id,
-                fields: ['name', 'geometry', 'formatted_address'],
-                sessionToken: sessionToken.current,
-            },
-            (place, status) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-                    const location: Location = {
-                        name: place.name || prediction.structured_formatting.main_text,
-                        displayName: place.formatted_address || prediction.description,
-                        lat: place.geometry.location.lat(),
-                        lng: place.geometry.location.lng(),
-                    };
-                    onPlaceSelect(location);
-                    // Refresh session token
-                    sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-                }
-            }
-        );
+        setMatches([]);
+        onPlaceSelect({
+            name: c.name,
+            displayName: `${c.name}, ${c.state}, India`,
+            lat: c.lat,
+            lng: c.lng,
+        });
     };
 
-    const clearInput = () => {
-        setInputValue('');
-        setPredictions([]);
-        setIsOpen(false);
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && matches.length > 0) {
+            e.preventDefault();
+            select(matches[0]);
+        }
     };
 
     return (
@@ -187,64 +143,44 @@ export default function GooglePlacesAutocomplete({
                 {label}
             </label>
             <div className="relative">
-                <div
-                    className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                    style={{ color: iconColor }}
-                >
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: iconColor }}>
                     <Search className="w-4 h-4" />
                 </div>
                 <input
                     type="text"
                     value={inputValue}
                     onChange={handleInputChange}
-                    onFocus={() => {
-                        if (inputValue.length >= 2) fetchPredictions(inputValue);
-                    }}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => { if (matches.length > 0) setIsOpen(true); }}
                     placeholder={placeholder}
                     className="w-full pl-9 pr-8 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                    autoComplete="off"
                 />
                 {inputValue && (
                     <button
-                        onClick={clearInput}
+                        onClick={() => { setInputValue(''); setMatches([]); setIsOpen(false); }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                         <X className="w-3.5 h-3.5" />
                     </button>
                 )}
-                {isLoading && (
-                    <div className="absolute right-8 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                    </div>
-                )}
             </div>
 
-            {/* Predictions Dropdown */}
-            {isOpen && predictions.length > 0 && (
+            {isOpen && matches.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-[100] max-h-[260px] overflow-y-auto">
-                    {predictions.map((prediction) => (
+                    {matches.map((c) => (
                         <button
-                            key={prediction.place_id}
-                            onClick={() => handleSelect(prediction)}
+                            key={`${c.name}-${c.state}`}
+                            onClick={() => select(c)}
                             className="w-full px-3 py-2.5 text-left hover:bg-blue-50/50 flex items-center gap-2.5 transition-colors"
                         >
                             <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             <div className="min-w-0">
-                                <div className="font-medium text-gray-800 text-sm truncate">
-                                    {prediction.structured_formatting.main_text}
-                                </div>
-                                <div className="text-xs text-gray-500 truncate">
-                                    {prediction.structured_formatting.secondary_text}
-                                </div>
+                                <div className="font-medium text-gray-800 text-sm truncate">{c.name}</div>
+                                <div className="text-xs text-gray-500 truncate">{c.state}, India</div>
                             </div>
                         </button>
                     ))}
-                    <div className="px-3 py-1.5 flex justify-end border-t border-gray-50">
-                        <img
-                            src="https://developers.google.com/static/maps/documentation/images/powered_by_google_on_white.png"
-                            alt="Powered by Google"
-                            className="h-3.5 opacity-60"
-                        />
-                    </div>
                 </div>
             )}
         </div>
