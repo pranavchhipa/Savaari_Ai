@@ -132,7 +132,7 @@ export default function SearchWidget() {
             </div>
 
             {/* Search Form Card */}
-            <div className="bg-white rounded-2xl rounded-t-none shadow-xl shadow-gray-200/60 border border-gray-200/60 border-t-0 overflow-visible">
+            <div className="bg-white rounded-2xl rounded-t-none shadow-2xl shadow-black/30 border border-gray-200/60 border-t-0 overflow-visible">
                 {/* Row 1: Locations */}
                 <div className="p-6 pb-0">
                     <div className="flex flex-col md:flex-row items-stretch gap-0 relative">

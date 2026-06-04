@@ -44,18 +44,17 @@ export default function Home() {
         <div className="min-h-screen bg-gray-50">
             {/* HERO + SEARCH (on top) */}
             <section className="relative pt-6 pb-24 overflow-hidden bg-[#0F172A]">
-                {/* Scenic background */}
+                {/* Scenic background (full opacity) */}
                 <div className="absolute inset-0 z-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop"
                         alt=""
-                        className="w-full h-full object-cover opacity-45"
+                        className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/75 to-[#0F172A]/40" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/70 to-transparent" />
+                    {/* light gradient just for text legibility */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/15 to-black/45" />
                 </div>
-                <div className="absolute top-0 right-0 w-96 h-96 bg-[#2563EB]/20 rounded-full blur-[120px] z-0" />
 
                 <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
                     <motion.h1
